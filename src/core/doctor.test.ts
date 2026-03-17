@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import { runDoctor } from './doctor.js';
 import type { GitHubService } from './github.js';
+import type { SkillCreatorService } from './skill-creator.js';
 import type { SkillForgeConfig } from '../types/config.js';
 import { createRecordingLogger } from '../test-utils/shared.js';
 
@@ -14,6 +15,41 @@ function createConfig(overrides: Partial<SkillForgeConfig> = {}): SkillForgeConf
     localRegistryPath: '/tmp/registry',
     registryRepoName: 'skills',
     ...overrides,
+  };
+}
+
+function createSkillCreatorStub(options?: {
+  availability?: {
+    availableAgents?: string[];
+    missingAgents?: string[];
+    unverifiedAgents?: string[];
+  };
+}): Pick<SkillCreatorService, 'buildDoctorDetail' | 'detectAvailability'> {
+  return {
+    buildDoctorDetail(availability) {
+      const parts: string[] = [];
+
+      if (availability.availableAgents.length > 0) {
+        parts.push(`installed for ${availability.availableAgents.join(', ')}`);
+      }
+
+      if (availability.missingAgents.length > 0) {
+        parts.push(`missing for ${availability.missingAgents.join(', ')}`);
+      }
+
+      if (availability.unverifiedAgents.length > 0) {
+        parts.push(`unverified for ${availability.unverifiedAgents.join(', ')}`);
+      }
+
+      return `${parts.join('; ')}. Recommended install: npx skills add https://github.com/anthropics/skills --skill skill-creator -g -a claude-code -a opencode -a codex`;
+    },
+    async detectAvailability() {
+      return {
+        availableAgents: (options?.availability?.availableAgents ?? []) as Array<'claude-code' | 'opencode' | 'codex'>,
+        missingAgents: (options?.availability?.missingAgents ?? []) as Array<'claude-code' | 'opencode' | 'codex'>,
+        unverifiedAgents: (options?.availability?.unverifiedAgents ?? []) as Array<'claude-code' | 'opencode' | 'codex'>,
+      };
+    },
   };
 }
 
@@ -68,12 +104,18 @@ describe('doctor checks', () => {
       pathExists: async () => true,
       readFile: async () => '{"ok":true}',
       resolveExecutable: async () => '/usr/bin/npx',
+      skillCreator: createSkillCreatorStub({
+        availability: {
+          availableAgents: ['claude-code', 'opencode', 'codex'],
+        },
+      }),
     });
 
     assert.equal(result.ok, true);
     assert.equal(result.checks.every((check) => check.status === 'pass'), true);
     assert.match(logs.join('\n'), /PASS Config file/);
     assert.match(logs.join('\n'), /PASS npx/);
+    assert.match(logs.join('\n'), /PASS skill-creator/);
   });
 
   test('runDoctor reports clear failures on an uninitialized setup', async () => {
@@ -94,6 +136,11 @@ describe('doctor checks', () => {
         throw new Error('missing');
       },
       resolveExecutable: async () => null,
+      skillCreator: createSkillCreatorStub({
+        availability: {
+          unverifiedAgents: ['claude-code', 'opencode', 'codex'],
+        },
+      }),
     });
 
     assert.equal(result.ok, false);
@@ -123,6 +170,12 @@ describe('doctor checks', () => {
       pathExists: async () => true,
       readFile: async () => '{"ok":true}',
       resolveExecutable: async () => '/usr/bin/npx',
+      skillCreator: createSkillCreatorStub({
+        availability: {
+          availableAgents: ['claude-code', 'opencode'],
+          missingAgents: ['codex'],
+        },
+      }),
     });
 
     assert.equal(result.checks.find((check) => check.label === 'GitHub token')?.status, 'unreachable');
@@ -150,8 +203,45 @@ describe('doctor checks', () => {
       pathExists: async () => true,
       readFile: async () => '{"ok":true}',
       resolveExecutable: async () => '/usr/bin/npx',
+      skillCreator: createSkillCreatorStub({
+        availability: {
+          availableAgents: ['claude-code', 'opencode', 'codex'],
+        },
+      }),
     });
 
     assert.equal(loadConfigCalls, 1);
+  });
+
+  test('runDoctor marks skill-creator as recommended when it is missing for some agents', async () => {
+    const logs: string[] = [];
+    const result = await runDoctor({
+      configFilePath: '/tmp/config.json',
+      github: createGitHubStub(),
+      loadConfig: async () => createConfig(),
+      logger: createRecordingLogger(logs),
+      makeGit: () => ({
+        async checkIsRepo() {
+          return true;
+        },
+        async listRemote() {
+          return 'ok';
+        },
+      }),
+      pathExists: async () => true,
+      readFile: async () => '{"ok":true}',
+      resolveExecutable: async () => '/usr/bin/npx',
+      skillCreator: createSkillCreatorStub({
+        availability: {
+          availableAgents: ['claude-code'],
+          missingAgents: ['opencode', 'codex'],
+        },
+      }),
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.checks.find((check) => check.label === 'skill-creator')?.status, 'recommended');
+    assert.match(logs.join('\n'), /RECOMMENDED skill-creator/);
+    assert.match(logs.join('\n'), /Recommended install: npx skills add https:\/\/github\.com\/anthropics\/skills --skill skill-creator -g -a claude-code -a opencode -a codex/);
   });
 });

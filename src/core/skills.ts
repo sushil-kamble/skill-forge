@@ -1,10 +1,15 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
-import { confirm, input, search } from '@inquirer/prompts';
+import { confirm, input, search, select } from '@inquirer/prompts';
 
 import { loadConfig } from './config.js';
 import { ensureInitializedRegistryPath } from './registry-path.js';
+import {
+  skillCreatorService,
+  type SkillCreatorAvailability,
+  type SkillCreatorService,
+} from './skill-creator.js';
 import { editorService, type EditorService } from '../utils/editor.js';
 import { pathExists } from '../utils/filesystem.js';
 import { logger, type Logger } from '../utils/logger.js';
@@ -24,6 +29,7 @@ export interface SkillPrompts {
   input(message: string, options?: { defaultValue?: string }): Promise<string>;
   confirm(message: string, defaultValue?: boolean): Promise<boolean>;
   search<T extends string>(message: string, choices: PromptChoice<T>[]): Promise<T>;
+  select<T extends string>(message: string, choices: PromptChoice<T>[]): Promise<T>;
 }
 
 export interface SkillSummary {
@@ -52,7 +58,10 @@ export interface SkillCommandDependencies {
   logger?: Logger;
   editor?: EditorService;
   loadConfig?: () => Promise<SkillForgeConfig>;
+  skillCreator?: SkillCreatorService;
 }
+
+type AuthoringMode = 'open-vscode' | 'skip' | 'use-skill-creator';
 
 const skillPrompts: SkillPrompts = {
   async input(message: string, options?: { defaultValue?: string }): Promise<string> {
@@ -90,6 +99,13 @@ const skillPrompts: SkillPrompts = {
           return haystack.includes(normalizedTerm);
         });
       },
+    });
+  },
+
+  async select<T extends string>(message: string, choices: PromptChoice<T>[]): Promise<T> {
+    return select<T>({
+      message,
+      choices,
     });
   },
 };
@@ -408,6 +424,120 @@ async function openSkillInEditor(
   log.info(`Opened: ${result.targetPath}`);
 }
 
+async function promptForAuthoringMode(prompts: SkillPrompts): Promise<AuthoringMode> {
+  return prompts.select<AuthoringMode>('How would you like to work on this skill?', [
+    {
+      value: 'open-vscode',
+      name: 'Open in VS Code',
+      description: 'Recommended for editing the full skill package',
+    },
+    {
+      value: 'use-skill-creator',
+      name: 'Use skill-creator',
+      description: 'Print a ready-to-copy prompt for your AI agent',
+    },
+    {
+      value: 'skip',
+      name: 'Skip opening anything',
+      description: 'Leave the files as-is for now',
+    },
+  ]);
+}
+
+interface SkillCreatorAssistOptions {
+  action: 'create' | 'edit';
+  skillDirectory: string;
+  skillFilePath: string;
+  skillName: string;
+}
+
+async function runSkillCreatorAssist(
+  options: SkillCreatorAssistOptions,
+  prompts: SkillPrompts,
+  editor: EditorService,
+  skillCreator: SkillCreatorService,
+  log: Logger,
+): Promise<void> {
+  const availability = await skillCreator.detectAvailability();
+  const hasSupportedAgent = availability.availableAgents.length > 0;
+
+  if (!hasSupportedAgent) {
+    log.warn(`skill-creator setup is incomplete: ${skillCreator.buildDoctorDetail(availability)}`);
+
+    const shouldInstall = await prompts.confirm(
+      'Install skill-creator globally for claude-code, opencode, and codex?',
+      true,
+    );
+
+    if (!shouldInstall) {
+      log.info('Falling back to manual editing in VS Code.');
+      await openSkillInEditor(options.skillDirectory, editor, log, {
+        fallbackFilePath: options.skillFilePath,
+        preferDirectory: true,
+      });
+      return;
+    }
+
+    await skillCreator.install();
+    log.success('Installed skill-creator globally.');
+  } else if (availability.missingAgents.length > 0 || availability.unverifiedAgents.length > 0) {
+    log.warn(skillCreator.buildDoctorDetail(availability));
+  }
+
+  const prompt =
+    options.action === 'create'
+      ? skillCreator.buildCreatePrompt(options.skillName, options.skillDirectory)
+      : skillCreator.buildEditPrompt(options.skillName, options.skillDirectory);
+
+  log.info(prompt);
+}
+
+async function handleAuthoringMode(
+  options: {
+    mode: AuthoringMode;
+    action: 'create' | 'edit';
+    skillName: string;
+    skillDirectory: string;
+    skillFilePath: string;
+  },
+  dependencies: {
+    prompts: SkillPrompts;
+    editor: EditorService;
+    skillCreator: SkillCreatorService;
+    log: Logger;
+  },
+): Promise<void> {
+  if (options.mode === 'skip') {
+    dependencies.log.info(
+      options.action === 'create'
+        ? `Skill created at ${options.skillDirectory}`
+        : `Skill available at ${options.skillDirectory}`,
+    );
+    return;
+  }
+
+  if (options.mode === 'use-skill-creator') {
+    await runSkillCreatorAssist(
+      {
+        action: options.action,
+        skillDirectory: options.skillDirectory,
+        skillFilePath: options.skillFilePath,
+        skillName: options.skillName,
+      },
+      dependencies.prompts,
+      dependencies.editor,
+      dependencies.skillCreator,
+      dependencies.log,
+    );
+    return;
+  }
+
+  await openSkillInEditor(options.skillDirectory, dependencies.editor, dependencies.log, {
+    fallbackFilePath: options.skillFilePath,
+    preferDirectory: true,
+  });
+}
+
 export async function createSkill(
   options: CreateSkillOptions = {},
   dependencies: SkillCommandDependencies = {},
@@ -416,6 +546,7 @@ export async function createSkill(
   const log = dependencies.logger ?? logger;
   const editor = dependencies.editor ?? editorService;
   const readConfig = dependencies.loadConfig ?? loadConfig;
+  const skillCreator = dependencies.skillCreator ?? skillCreatorService;
 
   const config = await readConfig();
   const localRegistryPath = ensureInitializedRegistryPath(config);
@@ -440,16 +571,45 @@ export async function createSkill(
       return;
     }
 
-    await openSkillInEditor(skillDirectory, editor, log, {
-      fallbackFilePath: skillFilePath,
-      preferDirectory: true,
-    });
+    const mode = await promptForAuthoringMode(prompts);
+    await handleAuthoringMode(
+      {
+        action: 'edit',
+        mode,
+        skillName: requestedName,
+        skillDirectory,
+        skillFilePath,
+      },
+      {
+        prompts,
+        editor,
+        skillCreator,
+        log,
+      },
+    );
     return;
   }
 
   await fs.mkdir(skillDirectory, { recursive: true });
   await fs.writeFile(skillFilePath, getDefaultSkillTemplate(requestedName), 'utf8');
-  await openSkillInEditor(skillFilePath, editor, log);
+  log.success(`Created skill "${requestedName}".`);
+
+  const mode = await promptForAuthoringMode(prompts);
+  await handleAuthoringMode(
+    {
+      action: 'create',
+      mode,
+      skillName: requestedName,
+      skillDirectory,
+      skillFilePath,
+    },
+    {
+      prompts,
+      editor,
+      skillCreator,
+      log,
+    },
+  );
 }
 
 export async function listSkills(dependencies: SkillCommandDependencies = {}): Promise<SkillSummary[]> {
@@ -476,6 +636,7 @@ export async function editSkill(
   const log = dependencies.logger ?? logger;
   const editor = dependencies.editor ?? editorService;
   const readConfig = dependencies.loadConfig ?? loadConfig;
+  const skillCreator = dependencies.skillCreator ?? skillCreatorService;
   const config = await readConfig();
   const localRegistryPath = ensureInitializedRegistryPath(config);
   const skills = await getSkillSummaries(localRegistryPath);
@@ -506,10 +667,22 @@ export async function editSkill(
   }
 
   const skillDirectory = getSkillDirectory(localRegistryPath, skillName);
-  await openSkillInEditor(skillDirectory, editor, log, {
-    fallbackFilePath: skillFilePath,
-    preferDirectory: true,
-  });
+  const mode = await promptForAuthoringMode(prompts);
+  await handleAuthoringMode(
+    {
+      action: 'edit',
+      mode,
+      skillName,
+      skillDirectory,
+      skillFilePath,
+    },
+    {
+      prompts,
+      editor,
+      skillCreator,
+      log,
+    },
+  );
   return skillName;
 }
 

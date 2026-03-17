@@ -14,16 +14,36 @@ export interface EditorService {
 }
 
 const FALLBACK_EDITORS = ['nano', 'vi'] as const;
+const PREFERRED_GUI_EDITORS = ['code', 'code-insiders'] as const;
 const TERMINAL_EDITORS = new Set(['nano', 'vi', 'vim']);
 
-async function resolveEditorCommand(): Promise<string | null> {
-  const preferredEditor = process.env.EDITOR?.trim();
+interface EditorDependencies {
+  env?: NodeJS.ProcessEnv;
+  launchEditor?: (command: string, filePath: string) => Promise<void>;
+  resolveExecutable?: (command: string) => Promise<string | null>;
+}
+
+async function resolveEditorCommand(
+  dependencies: EditorDependencies = {},
+): Promise<string | null> {
+  const env = dependencies.env ?? process.env;
+  const resolve = dependencies.resolveExecutable ?? resolveExecutable;
+
+  for (const guiEditor of PREFERRED_GUI_EDITORS) {
+    const executable = await resolve(guiEditor);
+
+    if (executable) {
+      return executable;
+    }
+  }
+
+  const preferredEditor = env.EDITOR?.trim();
 
   if (preferredEditor) {
     const [binary] = preferredEditor.split(/\s+/);
 
     if (binary) {
-      const executable = await resolveExecutable(binary);
+      const executable = await resolve(binary);
 
       if (executable) {
         return preferredEditor;
@@ -32,7 +52,7 @@ async function resolveEditorCommand(): Promise<string | null> {
   }
 
   for (const fallbackEditor of FALLBACK_EDITORS) {
-    const executable = await resolveExecutable(fallbackEditor);
+    const executable = await resolve(fallbackEditor);
 
     if (executable) {
       return executable;
@@ -78,26 +98,32 @@ async function launchEditor(command: string, filePath: string): Promise<void> {
   });
 }
 
-export const editorService: EditorService = {
-  async open(
-    targetPath: string,
-    options?: {
-      fallbackFilePath?: string;
-      preferDirectory?: boolean;
+export function createEditorService(dependencies: EditorDependencies = {}): EditorService {
+  const launch = dependencies.launchEditor ?? launchEditor;
+
+  return {
+    async open(
+      targetPath: string,
+      options?: {
+        fallbackFilePath?: string;
+        preferDirectory?: boolean;
+      },
+    ): Promise<{ opened: boolean; targetPath: string }> {
+      const editorCommand = await resolveEditorCommand(dependencies);
+
+      if (!editorCommand) {
+        return { opened: false, targetPath };
+      }
+
+      const resolvedTargetPath =
+        options?.preferDirectory && options.fallbackFilePath && isTerminalEditor(editorCommand)
+          ? options.fallbackFilePath
+          : targetPath;
+
+      await launch(editorCommand, resolvedTargetPath);
+      return { opened: true, targetPath: resolvedTargetPath };
     },
-  ): Promise<{ opened: boolean; targetPath: string }> {
-    const editorCommand = await resolveEditorCommand();
+  };
+}
 
-    if (!editorCommand) {
-      return { opened: false, targetPath };
-    }
-
-    const resolvedTargetPath =
-      options?.preferDirectory && options.fallbackFilePath && isTerminalEditor(editorCommand)
-        ? options.fallbackFilePath
-        : targetPath;
-
-    await launchEditor(editorCommand, resolvedTargetPath);
-    return { opened: true, targetPath: resolvedTargetPath };
-  },
-};
+export const editorService: EditorService = createEditorService();

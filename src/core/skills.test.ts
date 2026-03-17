@@ -12,6 +12,7 @@ import {
   type PromptChoice,
   type SkillPrompts,
 } from './skills.js';
+import type { SkillCreatorService } from './skill-creator.js';
 import type { SkillForgeConfig } from '../types/config.js';
 import type { EditorService } from '../utils/editor.js';
 import { createRecordingLogger, createSilentLogger, createTempDirTracker } from '../test-utils/shared.js';
@@ -43,6 +44,7 @@ class PromptStub implements SkillPrompts {
       input?: string[];
       confirm?: boolean[];
       search?: string[];
+      select?: string[];
     },
   ) {}
 
@@ -79,6 +81,16 @@ class PromptStub implements SkillPrompts {
 
     return value as T;
   }
+
+  async select<T extends string>(_message: string, choices: PromptChoice<T>[]): Promise<T> {
+    const value = this.nextResponse('select');
+
+    if (!choices.some((choice) => choice.value === value)) {
+      throw new Error(`Prompt choice "${value}" is not valid.`);
+    }
+
+    return value as T;
+  }
 }
 
 function createEditorStub(openedFiles: string[]): EditorService {
@@ -89,6 +101,42 @@ function createEditorStub(openedFiles: string[]): EditorService {
         opened: true,
         targetPath: filePath,
       };
+    },
+  };
+}
+
+function createSkillCreatorStub(options?: {
+  availability?: {
+    availableAgents?: string[];
+    missingAgents?: string[];
+    unverifiedAgents?: string[];
+  };
+  install?: () => Promise<void>;
+}): SkillCreatorService {
+  return {
+    buildCreatePrompt(skillName: string, skillDirectory: string): string {
+      return `CREATE PROMPT ${skillName} ${skillDirectory}`;
+    },
+    buildDoctorDetail(): string {
+      return 'unused';
+    },
+    buildEditPrompt(skillName: string, skillDirectory: string): string {
+      return `EDIT PROMPT ${skillName} ${skillDirectory}`;
+    },
+    async detectAvailability() {
+      return {
+        availableAgents: (options?.availability?.availableAgents ?? []) as Array<'claude-code' | 'opencode' | 'codex'>,
+        missingAgents: (options?.availability?.missingAgents ?? []) as Array<'claude-code' | 'opencode' | 'codex'>,
+        unverifiedAgents: (options?.availability?.unverifiedAgents ?? []) as Array<'claude-code' | 'opencode' | 'codex'>,
+      };
+    },
+    getInstallCommand(): string {
+      return 'npx skills add https://github.com/anthropics/skills --skill skill-creator -g -a claude-code -a opencode -a codex';
+    },
+    async install() {
+      if (options?.install) {
+        await options.install();
+      }
     },
   };
 }
@@ -111,20 +159,22 @@ describe('skill authoring commands', () => {
     const openedFiles: string[] = [];
 
     await createSkill(
-      { name: 'fastapi-structure' },
-      {
-        loadConfig: async () => config,
-        editor: createEditorStub(openedFiles),
-        logger: createSilentLogger(),
+        { name: 'fastapi-structure' },
+        {
+        prompts: new PromptStub({ select: ['open-vscode'] }),
+          loadConfig: async () => config,
+          editor: createEditorStub(openedFiles),
+          logger: createSilentLogger(),
       },
     );
 
     const skillFilePath = path.join(config.localRegistryPath!, 'skills', 'fastapi-structure', 'SKILL.md');
+    const skillDirectory = path.join(config.localRegistryPath!, 'skills', 'fastapi-structure');
     const content = await fs.readFile(skillFilePath, 'utf8');
 
     assert.match(content, /^---\nname: fastapi-structure\n/);
     assert.match(content, /description:\n  \[Describe what this skill does/);
-    assert.deepEqual(openedFiles, [skillFilePath]);
+    assert.deepEqual(openedFiles, [skillDirectory]);
   });
 
   test('createSkill rejects invalid names with a clear validation message', async () => {
@@ -194,6 +244,7 @@ description:
     await editSkill(
       { name: 'fastapi-structure' },
       {
+        prompts: new PromptStub({ select: ['open-vscode'] }),
         loadConfig: async () => config,
         editor: createEditorStub(openedFiles),
         logger: createSilentLogger(),
@@ -201,6 +252,135 @@ description:
     );
 
     assert.deepEqual(openedFiles, [skillDirectory]);
+  });
+
+  test('createSkill prints a ready-to-copy prompt when skill-creator is selected and available', async () => {
+    const config = await createInitializedConfig();
+    const logs: string[] = [];
+    const openedFiles: string[] = [];
+
+    await createSkill(
+      { name: 'fastapi-best-practices' },
+      {
+        prompts: new PromptStub({ select: ['use-skill-creator'] }),
+        loadConfig: async () => config,
+        editor: createEditorStub(openedFiles),
+        logger: createRecordingLogger(logs),
+        skillCreator: createSkillCreatorStub({
+          availability: {
+            availableAgents: ['claude-code'],
+            missingAgents: ['opencode', 'codex'],
+          },
+        }),
+      },
+    );
+
+    assert.deepEqual(openedFiles, []);
+    assert.match(logs.join('\n'), /CREATE PROMPT fastapi-best-practices/);
+  });
+
+  test('editSkill prints a ready-to-copy prompt when skill-creator is selected and available', async () => {
+    const config = await createInitializedConfig();
+    const logs: string[] = [];
+    const openedFiles: string[] = [];
+    await writeSkillFile(config, 'fastapi-best-practices');
+
+    await editSkill(
+      { name: 'fastapi-best-practices' },
+      {
+        prompts: new PromptStub({ select: ['use-skill-creator'] }),
+        loadConfig: async () => config,
+        editor: createEditorStub(openedFiles),
+        logger: createRecordingLogger(logs),
+        skillCreator: createSkillCreatorStub({
+          availability: {
+            availableAgents: ['claude-code'],
+          },
+        }),
+      },
+    );
+
+    assert.deepEqual(openedFiles, []);
+    assert.match(logs.join('\n'), /EDIT PROMPT fastapi-best-practices/);
+  });
+
+  test('createSkill offers to install skill-creator and prints the prompt after install', async () => {
+    const config = await createInitializedConfig();
+    const logs: string[] = [];
+    let installCalls = 0;
+
+    await createSkill(
+      { name: 'fastapi-best-practices' },
+      {
+        prompts: new PromptStub({
+          confirm: [true],
+          select: ['use-skill-creator'],
+        }),
+        loadConfig: async () => config,
+        logger: createRecordingLogger(logs),
+        skillCreator: createSkillCreatorStub({
+          availability: {
+            missingAgents: ['claude-code', 'opencode', 'codex'],
+          },
+          async install() {
+            installCalls += 1;
+          },
+        }),
+      },
+    );
+
+    assert.equal(installCalls, 1);
+    assert.match(logs.join('\n'), /Installed skill-creator globally\./);
+    assert.match(logs.join('\n'), /CREATE PROMPT fastapi-best-practices/);
+  });
+
+  test('createSkill falls back to VS Code when skill-creator install is declined', async () => {
+    const config = await createInitializedConfig();
+    const logs: string[] = [];
+    const openedFiles: string[] = [];
+    const skillDirectory = path.join(config.localRegistryPath!, 'skills', 'fastapi-best-practices');
+
+    await createSkill(
+      { name: 'fastapi-best-practices' },
+      {
+        prompts: new PromptStub({
+          confirm: [false],
+          select: ['use-skill-creator'],
+        }),
+        loadConfig: async () => config,
+        editor: createEditorStub(openedFiles),
+        logger: createRecordingLogger(logs),
+        skillCreator: createSkillCreatorStub({
+          availability: {
+            missingAgents: ['claude-code', 'opencode', 'codex'],
+          },
+        }),
+      },
+    );
+
+    assert.deepEqual(openedFiles, [skillDirectory]);
+    assert.match(logs.join('\n'), /Falling back to manual editing in VS Code\./);
+  });
+
+  test('editSkill can skip opening anything', async () => {
+    const config = await createInitializedConfig();
+    const logs: string[] = [];
+    const openedFiles: string[] = [];
+    const skillDirectory = path.join(config.localRegistryPath!, 'skills', 'fastapi-best-practices');
+    await writeSkillFile(config, 'fastapi-best-practices');
+
+    await editSkill(
+      { name: 'fastapi-best-practices' },
+      {
+        prompts: new PromptStub({ select: ['skip'] }),
+        loadConfig: async () => config,
+        editor: createEditorStub(openedFiles),
+        logger: createRecordingLogger(logs),
+      },
+    );
+
+    assert.deepEqual(openedFiles, []);
+    assert.match(logs.join('\n'), new RegExp(`Skill available at ${skillDirectory}`.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   });
 
   test('removeSkill confirms before deleting the skill directory', async () => {

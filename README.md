@@ -19,6 +19,8 @@ Authoring agent skills by hand gets messy fast. Files drift, repos become ad hoc
 
 - `init` sets up a GitHub-backed registry
 - `create`, `edit`, `list`, and `remove` manage skills locally
+- `create` and `edit` are VS Code-first, so authoring does not trap you in an inline terminal editor
+- optional `skill-creator` assist gives you a ready-to-copy prompt for Claude Code, OpenCode, or Codex
 - `push` and `sync` keep your registry in sync with GitHub
 - `install` hands off to `npx skills add ...` so your skills are available in your agents
 - `doctor` gives you a quick health check when something is off
@@ -28,6 +30,8 @@ Authoring agent skills by hand gets messy fast. Files drift, repos become ad hoc
 - GitHub-backed personal skills registry
 - Local-first workflow with explicit push and sync
 - Multi-file skill packages, not just a single `SKILL.md`
+- VS Code-first authoring flow for `create` and `edit`
+- Optional `skill-creator` assisted authoring flow for Claude Code, OpenCode, and Codex
 - Compatible with the `skills` / `skills.sh` ecosystem
 - Interactive CLI with safe prompts and clear failure modes
 - Production-ready guards for init state, Node version, git state, and token validation
@@ -35,6 +39,8 @@ Authoring agent skills by hand gets messy fast. Files drift, repos become ad hoc
 ## Install
 
 Node.js `18+` is required.
+
+For the best authoring experience, make sure the VS Code shell command is available as `code`.
 
 Install globally with your preferred package manager:
 
@@ -59,6 +65,12 @@ Create a skill:
 ```bash
 skill-forge create fastapi-structure
 ```
+
+`skill-forge` will then let you choose how to work:
+
+- open the skill package in VS Code
+- use the external `skill-creator` skill and paste a generated prompt into your AI agent
+- skip opening anything for now
 
 Review your local registry:
 
@@ -94,6 +106,15 @@ skill-forge push -m "add api-review skill"
 skill-forge install --skill api-review
 ```
 
+With the assist flow enabled, a common authoring loop looks like this:
+
+```bash
+skill-forge create fastapi-best-practices
+# choose "Use skill-creator"
+# paste the printed prompt into Claude Code, OpenCode, or Codex
+skill-forge push
+```
+
 ## Commands
 
 ```bash
@@ -106,6 +127,26 @@ skill-forge remove <name>
 skill-forge push [-m "message"]
 skill-forge sync
 skill-forge install [--list] [--skill <name>]... [-g] [-a <agent>] [-y] [--copy]
+```
+
+## Authoring Modes
+
+When you run `create` or `edit`, `skill-forge` offers three paths:
+
+- `Open in VS Code`: opens the full skill directory so you can work on `SKILL.md`, reference markdown files, and scripts together
+- `Use skill-creator`: checks whether the external `skill-creator` skill is installed globally and prints a ready-to-copy prompt for your AI agent
+- `Skip opening anything`: creates or resolves the skill package and exits cleanly
+
+If `skill-creator` is missing, `skill-forge` can optionally install it for:
+
+- `claude-code`
+- `opencode`
+- `codex`
+
+using the canonical command:
+
+```bash
+npx skills add https://github.com/anthropics/skills --skill skill-creator -g -a claude-code -a opencode -a codex
 ```
 
 ## Skill Structure
@@ -143,6 +184,22 @@ npx skills add <githubUsername>/skills
 ```
 
 That keeps `skill-forge` focused on authoring and registry management while still fitting into the broader skills tooling ecosystem.
+
+## Doctor
+
+`skill-forge doctor` checks the required parts of your setup:
+
+- config file
+- local git registry
+- GitHub token
+- remote repository reachability
+- `npx`
+
+It also includes a recommended authoring check for `skill-creator`. That check does not fail `doctor`, but it tells you whether the optional assisted workflow is ready for:
+
+- `claude-code`
+- `opencode`
+- `codex`
 
 ## Development
 
