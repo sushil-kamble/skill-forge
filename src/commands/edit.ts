@@ -1,3 +1,10 @@
-import { createStubCommand } from './stub-command.js';
+import { Command } from 'commander';
 
-export const editCommand = createStubCommand('edit', 'Edit an existing skill');
+import { editSkill } from '../core/skills.js';
+
+export const editCommand = new Command('edit')
+  .description('Edit an existing skill')
+  .argument('[name]', 'Skill name')
+  .action(async (name?: string) => {
+    await editSkill(name ? { name } : {});
+  });

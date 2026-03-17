@@ -1,3 +1,9 @@
-import { createStubCommand } from './stub-command.js';
+import { Command } from 'commander';
 
-export const listCommand = createStubCommand('list', 'List available skills');
+import { listSkills } from '../core/skills.js';
+
+export const listCommand = new Command('list')
+  .description('List available skills')
+  .action(async () => {
+    await listSkills();
+  });

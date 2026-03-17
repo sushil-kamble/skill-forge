@@ -3,21 +3,14 @@ import path from 'node:path';
 
 import { simpleGit } from 'simple-git';
 
+import { pathExists } from '../utils/filesystem.js';
+
 export interface GitService {
   pathExists(targetPath: string): Promise<boolean>;
   isGitRepository(targetPath: string): Promise<boolean>;
   removeDirectory(targetPath: string): Promise<void>;
   cloneRepository(repoUrl: string, targetPath: string): Promise<void>;
   ensureSkillsDirectory(targetPath: string, githubUsername: string): Promise<boolean>;
-}
-
-async function pathExists(targetPath: string): Promise<boolean> {
-  try {
-    await fs.access(targetPath);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 async function removeDirectory(targetPath: string): Promise<void> {

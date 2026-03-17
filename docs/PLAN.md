@@ -166,7 +166,7 @@ Read all subdirectories under `<localRegistryPath>/skills/`. For each, parse the
 
 ### `skill-forge edit <name>`
 
-Resolve the skill directory. If name is omitted, show an interactive fuzzy-select list of existing skills (Inquirer.js). Open `SKILL.md` in `$EDITOR`. If the skill doesn't exist, error with suggestions (show similar names if any).
+Resolve the skill directory. If name is omitted, show an interactive fuzzy-select list of existing skills (Inquirer.js). Open the **skill directory** (not just `SKILL.md`) in `$EDITOR` by passing the directory path as the argument. Editors like VS Code and Cursor open the full skill package this way: `SKILL.md`, any reference files (`REFERENCE.md`, `PATTERNS.md`, etc.), and any `scripts/` subdirectory. The user can freely add, edit, or remove any files inside the skill directory. Fallback: if `$EDITOR` is a known terminal editor (nano, vi, vim), open `SKILL.md` directly since terminal editors do not handle directory arguments. If the skill doesn't exist, error with suggestions (show similar names if any).
 
 ### `skill-forge remove <name>`
 

@@ -1,3 +1,10 @@
-import { createStubCommand } from './stub-command.js';
+import { Command } from 'commander';
 
-export const removeCommand = createStubCommand('remove', 'Remove an existing skill');
+import { removeSkill } from '../core/skills.js';
+
+export const removeCommand = new Command('remove')
+  .description('Remove an existing skill')
+  .argument('<name>', 'Skill name')
+  .action(async (name: string) => {
+    await removeSkill({ name });
+  });
