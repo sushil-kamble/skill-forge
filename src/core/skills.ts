@@ -5,11 +5,7 @@ import { confirm, input, search, select } from '@inquirer/prompts';
 
 import { loadConfig } from './config.js';
 import { ensureInitializedRegistryPath } from './registry-path.js';
-import {
-  skillCreatorService,
-  type SkillCreatorAvailability,
-  type SkillCreatorService,
-} from './skill-creator.js';
+import { skillCreatorService, type SkillCreatorService } from './skill-creator.js';
 import { editorService, type EditorService } from '../utils/editor.js';
 import { pathExists } from '../utils/filesystem.js';
 import { logger, type Logger } from '../utils/logger.js';
@@ -162,7 +158,11 @@ async function ensureSkillsDirectoryExists(skillsDirectory: string): Promise<voi
   await fs.mkdir(skillsDirectory, { recursive: true });
 }
 
-function parseFrontmatter(content: string): { name: string | null; description: string | null; valid: boolean } {
+function parseFrontmatter(content: string): {
+  name: string | null;
+  description: string | null;
+  valid: boolean;
+} {
   if (!content.startsWith('---\n')) {
     return { name: null, description: null, valid: false };
   }
@@ -259,7 +259,9 @@ function formatTable(rows: SkillSummary[]): string {
   );
 
   const separator = widths.map((width) => '-'.repeat(width)).join('  ');
-  const headerLine = headers.map((header, index) => padCell(header, widths[index] ?? header.length)).join('  ');
+  const headerLine = headers
+    .map((header, index) => padCell(header, widths[index] ?? header.length))
+    .join('  ');
   const bodyLines = tableRows.map((row) =>
     row.map((cell, index) => padCell(cell ?? '', widths[index] ?? 0)).join('  '),
   );
@@ -268,7 +270,9 @@ function formatTable(rows: SkillSummary[]): string {
 }
 
 function levenshteinDistance(left: string, right: string): number {
-  const matrix = Array.from({ length: left.length + 1 }, () => new Array<number>(right.length + 1).fill(0));
+  const matrix = Array.from({ length: left.length + 1 }, () =>
+    new Array<number>(right.length + 1).fill(0),
+  );
 
   for (let index = 0; index <= left.length; index += 1) {
     matrix[index]![0] = index;
@@ -318,7 +322,10 @@ function rankSkillNames(names: string[], target: string): string[] {
     .map((entry) => entry.name);
 }
 
-async function readSkillSummary(localRegistryPath: string, entryName: string): Promise<SkillSummary> {
+async function readSkillSummary(
+  localRegistryPath: string,
+  entryName: string,
+): Promise<SkillSummary> {
   const skillPath = getSkillDirectory(localRegistryPath, entryName);
   const skillFilePath = path.join(skillPath, 'SKILL.md');
 
@@ -343,7 +350,7 @@ async function readSkillSummary(localRegistryPath: string, entryName: string): P
 
   return {
     name: frontmatter.name ?? entryName,
-    description: frontmatter.valid ? frontmatter.description ?? '' : DESCRIPTION_FALLBACK,
+    description: frontmatter.valid ? (frontmatter.description ?? '') : DESCRIPTION_FALLBACK,
     skillPath,
     skillFilePath,
     updatedAt: fileStats.mtime,
@@ -356,9 +363,14 @@ async function getSkillSummaries(localRegistryPath: string): Promise<SkillSummar
   await ensureSkillsDirectoryExists(skillsDirectory);
 
   const entries = await fs.readdir(skillsDirectory, { withFileTypes: true });
-  const skillDirectories = entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
+  const skillDirectories = entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
 
-  return Promise.all(skillDirectories.map((entryName) => readSkillSummary(localRegistryPath, entryName)));
+  return Promise.all(
+    skillDirectories.map((entryName) => readSkillSummary(localRegistryPath, entryName)),
+  );
 }
 
 async function resolveSkillName(
@@ -368,7 +380,9 @@ async function resolveSkillName(
   log: Logger,
   interactiveSuggestion: boolean,
 ): Promise<string> {
-  const exactMatch = skills.find((skill) => skill.name === requestedName || path.basename(skill.skillPath) === requestedName);
+  const exactMatch = skills.find(
+    (skill) => skill.name === requestedName || path.basename(skill.skillPath) === requestedName,
+  );
 
   if (exactMatch) {
     return path.basename(exactMatch.skillPath);
@@ -612,7 +626,9 @@ export async function createSkill(
   );
 }
 
-export async function listSkills(dependencies: SkillCommandDependencies = {}): Promise<SkillSummary[]> {
+export async function listSkills(
+  dependencies: SkillCommandDependencies = {},
+): Promise<SkillSummary[]> {
   const log = dependencies.logger ?? logger;
   const readConfig = dependencies.loadConfig ?? loadConfig;
   const config = await readConfig();
@@ -663,7 +679,9 @@ export async function editSkill(
   const skillFilePath = getSkillFilePath(localRegistryPath, skillName);
 
   if (!(await pathExists(skillFilePath))) {
-    throw new Error(`Skill "${skillName}" is missing SKILL.md. Fix it manually at ${path.dirname(skillFilePath)}.`);
+    throw new Error(
+      `Skill "${skillName}" is missing SKILL.md. Fix it manually at ${path.dirname(skillFilePath)}.`,
+    );
   }
 
   const skillDirectory = getSkillDirectory(localRegistryPath, skillName);

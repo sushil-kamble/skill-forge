@@ -1,7 +1,11 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { assertSupportedNodeVersion, commandRequiresInitialization, ensureCommandInitialization } from './runtime.js';
+import {
+  assertSupportedNodeVersion,
+  commandRequiresInitialization,
+  ensureCommandInitialization,
+} from './runtime.js';
 import type { SkillForgeConfig } from '../types/config.js';
 
 function createConfig(overrides: Partial<SkillForgeConfig> = {}): SkillForgeConfig {
@@ -17,10 +21,7 @@ function createConfig(overrides: Partial<SkillForgeConfig> = {}): SkillForgeConf
 
 describe('runtime guards', () => {
   test('assertSupportedNodeVersion rejects unsupported Node.js versions', () => {
-    assert.throws(
-      () => assertSupportedNodeVersion('16.20.0'),
-      /requires Node\.js 18 or newer/,
-    );
+    assert.throws(() => assertSupportedNodeVersion('16.20.0'), /requires Node\.js 18 or newer/);
   });
 
   test('commandRequiresInitialization exempts init and doctor', () => {

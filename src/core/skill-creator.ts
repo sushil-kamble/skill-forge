@@ -214,7 +214,9 @@ export function createSkillCreatorService(
         await runner.run('npx', buildSkillCreatorInstallArgs(), { stdio: 'inherit' });
       } catch (error) {
         const command = getInstallCommand();
-        throw new Error(`Failed to install ${SKILL_CREATOR_NAME}. Try "${command}". ${getErrorMessage(error)}`);
+        throw new Error(
+          `Failed to install ${SKILL_CREATOR_NAME}. Try "${command}". ${getErrorMessage(error)}`,
+        );
       }
     },
   };

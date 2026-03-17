@@ -1,5 +1,3 @@
-import path from 'node:path';
-
 import { confirm } from '@inquirer/prompts';
 import { simpleGit, type SimpleGit } from 'simple-git';
 
@@ -139,7 +137,9 @@ function parseStatusSummary(porcelain: string): ChangeSummary {
   for (const line of lines) {
     const statusCode = line.slice(0, 2);
     const pathSection = line.slice(3).trim();
-    const filePath = pathSection.includes(' -> ') ? pathSection.split(' -> ').at(-1) ?? pathSection : pathSection;
+    const filePath = pathSection.includes(' -> ')
+      ? (pathSection.split(' -> ').at(-1) ?? pathSection)
+      : pathSection;
     const entityName = extractEntityName(filePath);
     const statusChars = statusCode.replace(/\s/g, '').split('');
     const effectiveStatuses = statusChars.length > 0 ? statusChars : ['M'];
@@ -192,7 +192,9 @@ function formatSummary(summary: ChangeSummary, heading: string): string {
 }
 
 function isSummaryEmpty(summary: ChangeSummary): boolean {
-  return summary.added.length === 0 && summary.modified.length === 0 && summary.removed.length === 0;
+  return (
+    summary.added.length === 0 && summary.modified.length === 0 && summary.removed.length === 0
+  );
 }
 
 async function assertRegistryReady(localRegistryPath: string): Promise<SimpleGit> {
@@ -218,7 +220,12 @@ async function assertRegistryReady(localRegistryPath: string): Promise<SimpleGit
 }
 
 async function getAheadBehindCounts(git: SimpleGit): Promise<{ ahead: number; behind: number }> {
-  const output = await git.raw(['rev-list', '--left-right', '--count', `HEAD...${REMOTE_NAME}/${REMOTE_BRANCH}`]);
+  const output = await git.raw([
+    'rev-list',
+    '--left-right',
+    '--count',
+    `HEAD...${REMOTE_NAME}/${REMOTE_BRANCH}`,
+  ]);
   const [aheadRaw, behindRaw] = output.trim().split(/\s+/);
 
   return {
@@ -269,13 +276,17 @@ export async function pushRegistry(
   try {
     await fetchRemote(git);
   } catch (error) {
-    throw new Error(`Failed to contact the remote repository. ${createNetworkErrorMessage(getErrorMessage(error))}`);
+    throw new Error(
+      `Failed to contact the remote repository. ${createNetworkErrorMessage(getErrorMessage(error))}`,
+    );
   }
 
   const aheadBehind = await getAheadBehindCounts(git);
 
   if (aheadBehind.behind > 0) {
-    throw new Error('Remote changes exist that are not in your local registry. Run "skill-forge sync" first.');
+    throw new Error(
+      'Remote changes exist that are not in your local registry. Run "skill-forge sync" first.',
+    );
   }
 
   const porcelain = await git.raw(['status', '--porcelain', '--untracked-files=all']);
@@ -305,7 +316,9 @@ export async function pushRegistry(
     await git.commit(commitMessage);
     await git.push(REMOTE_NAME, REMOTE_BRANCH);
   } catch (error) {
-    throw new Error(`Failed to push registry changes. ${createNetworkErrorMessage(getErrorMessage(error))}`);
+    throw new Error(
+      `Failed to push registry changes. ${createNetworkErrorMessage(getErrorMessage(error))}`,
+    );
   }
 
   if (config.registryRepoUrl) {
@@ -336,7 +349,9 @@ export async function syncRegistry(
     await fetchRemote(git);
     beforeHead = (await git.revparse(['HEAD'])).trim();
   } catch (error) {
-    throw new Error(`Failed to contact the remote repository. ${createNetworkErrorMessage(getErrorMessage(error))}`);
+    throw new Error(
+      `Failed to contact the remote repository. ${createNetworkErrorMessage(getErrorMessage(error))}`,
+    );
   }
 
   try {
@@ -351,7 +366,9 @@ export async function syncRegistry(
       );
     }
 
-    throw new Error(`Failed to sync registry changes. ${createNetworkErrorMessage(getErrorMessage(error))}`);
+    throw new Error(
+      `Failed to sync registry changes. ${createNetworkErrorMessage(getErrorMessage(error))}`,
+    );
   }
 
   const afterHead = (await git.revparse(['HEAD'])).trim();

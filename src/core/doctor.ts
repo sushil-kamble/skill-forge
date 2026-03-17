@@ -90,9 +90,7 @@ function looksUnreachable(errorMessage: string): boolean {
   );
 }
 
-export async function runDoctor(
-  dependencies: DoctorDependencies = {},
-): Promise<DoctorResult> {
+export async function runDoctor(dependencies: DoctorDependencies = {}): Promise<DoctorResult> {
   const configFilePath = dependencies.configFilePath ?? getConfigFilePath();
   const github = dependencies.github ?? githubService;
   const readConfig = dependencies.loadConfig ?? loadConfig;
@@ -102,9 +100,7 @@ export async function runDoctor(
   const readFile =
     dependencies.readFile ?? (async (filePath: string) => fs.readFile(filePath, 'utf8'));
   const findExecutable = dependencies.resolveExecutable ?? resolveExecutable;
-  const makeGit =
-    dependencies.makeGit ??
-    ((directory: string) => simpleGit(directory));
+  const makeGit = dependencies.makeGit ?? ((directory: string) => simpleGit(directory));
 
   const checks: DoctorCheck[] = [];
   const hasConfigFile = await exists(configFilePath);
@@ -139,19 +135,30 @@ export async function runDoctor(
     const registryExists = await exists(config.localRegistryPath);
 
     if (!registryExists) {
-      checks.push(createFail('Local registry', `Directory not found at ${config.localRegistryPath}`));
+      checks.push(
+        createFail('Local registry', `Directory not found at ${config.localRegistryPath}`),
+      );
     } else {
       try {
         const git = makeGit(config.localRegistryPath);
         const isRepo = await git.checkIsRepo();
 
         if (!isRepo) {
-          checks.push(createFail('Local registry', `Path exists but is not a git repo: ${config.localRegistryPath}`));
+          checks.push(
+            createFail(
+              'Local registry',
+              `Path exists but is not a git repo: ${config.localRegistryPath}`,
+            ),
+          );
         } else {
-          checks.push(createPass('Local registry', `Git repository found at ${config.localRegistryPath}`));
+          checks.push(
+            createPass('Local registry', `Git repository found at ${config.localRegistryPath}`),
+          );
         }
       } catch (error) {
-        checks.push(createFail('Local registry', `Failed to inspect git repo: ${getErrorMessage(error)}`));
+        checks.push(
+          createFail('Local registry', `Failed to inspect git repo: ${getErrorMessage(error)}`),
+        );
       }
     }
 
@@ -173,7 +180,9 @@ export async function runDoctor(
       await git.listRemote(['--heads', 'origin']);
       checks.push(createPass('Remote repository', 'Origin remote is reachable.'));
     } catch (error) {
-      checks.push(createFail('Remote repository', `Failed to reach origin: ${getErrorMessage(error)}`));
+      checks.push(
+        createFail('Remote repository', `Failed to reach origin: ${getErrorMessage(error)}`),
+      );
     }
   } else {
     checks.push(createFail('Local registry', INITIALIZATION_MESSAGE));
@@ -196,10 +205,7 @@ export async function runDoctor(
       unverifiedAgents: ['claude-code', 'opencode', 'codex'],
     };
     checks.push(
-      createRecommended(
-        'skill-creator',
-        skillCreator.buildDoctorDetail(unavailableAvailability),
-      ),
+      createRecommended('skill-creator', skillCreator.buildDoctorDetail(unavailableAvailability)),
     );
   } else {
     const availability = await skillCreator.detectAvailability();

@@ -47,7 +47,9 @@ class PromptStub implements PromptService {
     },
   ) {}
 
-  private nextResponse<K extends keyof PromptStub['responses']>(key: K): NonNullable<PromptStub['responses'][K]>[number] {
+  private nextResponse<K extends keyof PromptStub['responses']>(
+    key: K,
+  ): NonNullable<PromptStub['responses'][K]>[number] {
     const values = this.responses[key];
 
     if (!values || values.length === 0) {

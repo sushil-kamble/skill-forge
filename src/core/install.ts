@@ -130,11 +130,15 @@ export async function installSkills(
   );
 
   if (repositoryStatus.isPrivate) {
-    log.warn('Your skills repository is private. skills.sh requires a public repo and may not be able to fetch it.');
+    log.warn(
+      'Your skills repository is private. skills.sh requires a public repo and may not be able to fetch it.',
+    );
   }
 
   if (!repositoryStatus.hasSkillsDirectory) {
-    log.warn('Your GitHub skills registry has no pushed skills yet. You may need to run "skill-forge push" first.');
+    log.warn(
+      'Your GitHub skills registry has no pushed skills yet. You may need to run "skill-forge push" first.',
+    );
   }
 
   const args = buildInstallArgs(registryTarget, options);
@@ -143,7 +147,9 @@ export async function installSkills(
     await runner.run('npx', args);
   } catch (error) {
     if (isCommandNotFound(error)) {
-      throw new Error('Failed to run npx. Install Node.js and make sure "npx" is available in your PATH.');
+      throw new Error(
+        'Failed to run npx. Install Node.js and make sure "npx" is available in your PATH.',
+      );
     }
 
     throw new Error(`Failed to run "npx ${args.join(' ')}". ${getErrorMessage(error)}`);

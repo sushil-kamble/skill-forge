@@ -86,12 +86,24 @@ test('build prompts include the skill name and target directory', () => {
     },
   });
 
-  const createPrompt = service.buildCreatePrompt('fastapi-best-practices', '/tmp/skills/fastapi-best-practices');
-  const editPrompt = service.buildEditPrompt('fastapi-best-practices', '/tmp/skills/fastapi-best-practices');
+  const createPrompt = service.buildCreatePrompt(
+    'fastapi-best-practices',
+    '/tmp/skills/fastapi-best-practices',
+  );
+  const editPrompt = service.buildEditPrompt(
+    'fastapi-best-practices',
+    '/tmp/skills/fastapi-best-practices',
+  );
 
   assert.match(createPrompt, /fastapi-best-practices/);
-  assert.match(createPrompt, /Work only inside this directory: \/tmp\/skills\/fastapi-best-practices/);
-  assert.match(editPrompt, /Review and improve the existing `fastapi-best-practices` skill package/);
+  assert.match(
+    createPrompt,
+    /Work only inside this directory: \/tmp\/skills\/fastapi-best-practices/,
+  );
+  assert.match(
+    editPrompt,
+    /Review and improve the existing `fastapi-best-practices` skill package/,
+  );
 });
 
 test('doctor detail includes the recommended install command when setup is incomplete', () => {
@@ -110,5 +122,8 @@ test('doctor detail includes the recommended install command when setup is incom
   assert.match(detail, /installed for claude-code/);
   assert.match(detail, /missing for opencode/);
   assert.match(detail, /unverified for codex/);
-  assert.match(detail, new RegExp(skillCreatorInternals.getInstallCommand().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(
+    detail,
+    new RegExp(skillCreatorInternals.getInstallCommand().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+  );
 });

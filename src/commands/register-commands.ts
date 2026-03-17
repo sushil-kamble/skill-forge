@@ -1,4 +1,4 @@
-import { Command } from 'commander';
+import type { Command } from 'commander';
 
 import { createCommand } from './create.js';
 import { doctorCommand } from './doctor.js';

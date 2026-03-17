@@ -78,9 +78,11 @@ async function promptForGitHubToken(
   log: Logger,
 ): Promise<{ githubToken: string; githubUsername: string }> {
   for (let attempt = 1; attempt <= MAX_TOKEN_ATTEMPTS; attempt += 1) {
-    const githubToken = (await prompts.password(
-      `GitHub Personal Access Token (repo scope required). Create one at ${TOKEN_HELP_URL}`,
-    )).trim();
+    const githubToken = (
+      await prompts.password(
+        `GitHub Personal Access Token (repo scope required). Create one at ${TOKEN_HELP_URL}`,
+      )
+    ).trim();
 
     if (githubToken.length === 0) {
       log.error('A GitHub token is required.');
@@ -126,9 +128,11 @@ async function promptForRepository(
   }
 
   for (let attempt = 1; attempt <= MAX_REPO_URL_ATTEMPTS; attempt += 1) {
-    const repoUrl = (await prompts.input(
-      'GitHub repository URL (HTTPS), for example https://github.com/<owner>/<repo>',
-    )).trim();
+    const repoUrl = (
+      await prompts.input(
+        'GitHub repository URL (HTTPS), for example https://github.com/<owner>/<repo>',
+      )
+    ).trim();
 
     try {
       return await github.getRepository(githubToken, repoUrl);
@@ -207,7 +211,10 @@ export async function initializeSkillForge(
   const alreadyInitialized = isInitializedConfig(existingConfig);
 
   if (alreadyInitialized) {
-    const shouldReinitialize = await prompts.confirm('skill-forge is already initialized. Reinitialize?', false);
+    const shouldReinitialize = await prompts.confirm(
+      'skill-forge is already initialized. Reinitialize?',
+      false,
+    );
 
     if (!shouldReinitialize) {
       log.info('Initialization cancelled.');
@@ -218,7 +225,10 @@ export async function initializeSkillForge(
   const { githubToken, githubUsername } = await promptForGitHubToken(prompts, github, log);
   const setupMode = await promptForRepositoryMode(prompts);
   const repository = await promptForRepository(setupMode, prompts, github, githubToken, log);
-  const localRegistryPath = getConfiguredLocalRegistryPath(existingConfig, resolveLocalRegistryPath);
+  const localRegistryPath = getConfiguredLocalRegistryPath(
+    existingConfig,
+    resolveLocalRegistryPath,
+  );
 
   await prepareLocalRegistryPath(localRegistryPath, git, alreadyInitialized);
   await cloneRegistryRepository(repository, localRegistryPath, git);

@@ -54,7 +54,10 @@ async function cloneWorkingRepository(remotePath: string, cloneName: string): Pr
   return localPath;
 }
 
-async function createConfig(localRegistryPath: string, repoUrl = 'https://github.com/octocat/skills'): Promise<SkillForgeConfig> {
+async function createConfig(
+  localRegistryPath: string,
+  repoUrl = 'https://github.com/octocat/skills',
+): Promise<SkillForgeConfig> {
   return {
     githubToken: 'token',
     githubUsername: 'octocat',
@@ -78,7 +81,11 @@ function createPromptStub(confirmValues: boolean[]): RegistryPrompts {
   };
 }
 
-async function writeSkill(localRegistryPath: string, name: string, content?: string): Promise<void> {
+async function writeSkill(
+  localRegistryPath: string,
+  name: string,
+  content?: string,
+): Promise<void> {
   const skillDirectory = path.join(localRegistryPath, 'skills', name);
   await fs.mkdir(skillDirectory, { recursive: true });
   await fs.writeFile(
@@ -115,7 +122,9 @@ describe('registry git workflows', () => {
     assert.equal(result.status, 'pushed');
 
     const verificationClone = await cloneWorkingRepository(barePath, 'verify-push');
-    await assert.doesNotReject(() => fs.access(path.join(verificationClone, 'skills', 'fastapi-structure', 'SKILL.md')));
+    await assert.doesNotReject(() =>
+      fs.access(path.join(verificationClone, 'skills', 'fastapi-structure', 'SKILL.md')),
+    );
   });
 
   test('pushRegistry reports up to date when there are no local changes', async () => {
@@ -123,12 +132,14 @@ describe('registry git workflows', () => {
     const localPath = await cloneWorkingRepository(barePath, 'local-up-to-date');
     const logs: string[] = [];
 
-    const result = await pushRegistry({
-    }, {
-      prompts: createPromptStub([true]),
-      logger: createRecordingLogger(logs),
-      loadConfig: async () => createConfig(localPath),
-    });
+    const result = await pushRegistry(
+      {},
+      {
+        prompts: createPromptStub([true]),
+        logger: createRecordingLogger(logs),
+        loadConfig: async () => createConfig(localPath),
+      },
+    );
 
     assert.equal(result.status, 'up_to_date');
     assert.match(logs.join('\n'), /Registry is up to date/);
@@ -173,7 +184,9 @@ describe('registry git workflows', () => {
     });
 
     assert.equal(result.status, 'synced');
-    await assert.doesNotReject(() => fs.access(path.join(localPath, 'skills', 'fastapi-structure', 'SKILL.md')));
+    await assert.doesNotReject(() =>
+      fs.access(path.join(localPath, 'skills', 'fastapi-structure', 'SKILL.md')),
+    );
     assert.deepEqual(result.summary.added, ['fastapi-structure']);
   });
 
@@ -240,11 +253,14 @@ description: Remote conflicting change
 
     await assert.rejects(
       () =>
-        pushRegistry({}, {
-          prompts: createPromptStub([true]),
-          logger: createRecordingLogger(),
-          loadConfig: async () => createConfig(localPath),
-        }),
+        pushRegistry(
+          {},
+          {
+            prompts: createPromptStub([true]),
+            logger: createRecordingLogger(),
+            loadConfig: async () => createConfig(localPath),
+          },
+        ),
       /not a git repository/,
     );
 
@@ -275,11 +291,14 @@ description: Remote conflicting change
 
     await assert.rejects(
       () =>
-        pushRegistry({}, {
-          prompts: createPromptStub([true]),
-          logger: createRecordingLogger(),
-          loadConfig: async () => createConfig(localPath),
-        }),
+        pushRegistry(
+          {},
+          {
+            prompts: createPromptStub([true]),
+            logger: createRecordingLogger(),
+            loadConfig: async () => createConfig(localPath),
+          },
+        ),
       /Run "skill-forge sync" first/,
     );
   });

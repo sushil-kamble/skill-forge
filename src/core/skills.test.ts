@@ -15,7 +15,11 @@ import {
 import type { SkillCreatorService } from './skill-creator.js';
 import type { SkillForgeConfig } from '../types/config.js';
 import type { EditorService } from '../utils/editor.js';
-import { createRecordingLogger, createSilentLogger, createTempDirTracker } from '../test-utils/shared.js';
+import {
+  createRecordingLogger,
+  createSilentLogger,
+  createTempDirTracker,
+} from '../test-utils/shared.js';
 
 afterEach(async () => {
   await tempDirTracker.cleanup();
@@ -48,7 +52,9 @@ class PromptStub implements SkillPrompts {
     },
   ) {}
 
-  private nextResponse<K extends keyof PromptStub['responses']>(key: K): NonNullable<PromptStub['responses'][K]>[number] {
+  private nextResponse<K extends keyof PromptStub['responses']>(
+    key: K,
+  ): NonNullable<PromptStub['responses'][K]>[number] {
     const values = this.responses[key];
 
     if (!values || values.length === 0) {
@@ -125,9 +131,15 @@ function createSkillCreatorStub(options?: {
     },
     async detectAvailability() {
       return {
-        availableAgents: (options?.availability?.availableAgents ?? []) as Array<'claude-code' | 'opencode' | 'codex'>,
-        missingAgents: (options?.availability?.missingAgents ?? []) as Array<'claude-code' | 'opencode' | 'codex'>,
-        unverifiedAgents: (options?.availability?.unverifiedAgents ?? []) as Array<'claude-code' | 'opencode' | 'codex'>,
+        availableAgents: (options?.availability?.availableAgents ?? []) as Array<
+          'claude-code' | 'opencode' | 'codex'
+        >,
+        missingAgents: (options?.availability?.missingAgents ?? []) as Array<
+          'claude-code' | 'opencode' | 'codex'
+        >,
+        unverifiedAgents: (options?.availability?.unverifiedAgents ?? []) as Array<
+          'claude-code' | 'opencode' | 'codex'
+        >,
       };
     },
     getInstallCommand(): string {
@@ -159,16 +171,21 @@ describe('skill authoring commands', () => {
     const openedFiles: string[] = [];
 
     await createSkill(
-        { name: 'fastapi-structure' },
-        {
+      { name: 'fastapi-structure' },
+      {
         prompts: new PromptStub({ select: ['open-vscode'] }),
-          loadConfig: async () => config,
-          editor: createEditorStub(openedFiles),
-          logger: createSilentLogger(),
+        loadConfig: async () => config,
+        editor: createEditorStub(openedFiles),
+        logger: createSilentLogger(),
       },
     );
 
-    const skillFilePath = path.join(config.localRegistryPath!, 'skills', 'fastapi-structure', 'SKILL.md');
+    const skillFilePath = path.join(
+      config.localRegistryPath!,
+      'skills',
+      'fastapi-structure',
+      'SKILL.md',
+    );
     const skillDirectory = path.join(config.localRegistryPath!, 'skills', 'fastapi-structure');
     const content = await fs.readFile(skillFilePath, 'utf8');
 
@@ -216,7 +233,10 @@ description:
 
     assert.equal(skills.length, 1);
     assert.equal(skills[0]?.name, 'fastapi-structure');
-    assert.equal(skills[0]?.description, 'Build a clean FastAPI project structure for backend services.');
+    assert.equal(
+      skills[0]?.description,
+      'Build a clean FastAPI project structure for backend services.',
+    );
     assert.match(logs[0] ?? '', /fastapi-structure/);
   });
 
@@ -380,7 +400,10 @@ description:
     );
 
     assert.deepEqual(openedFiles, []);
-    assert.match(logs.join('\n'), new RegExp(`Skill available at ${skillDirectory}`.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    assert.match(
+      logs.join('\n'),
+      new RegExp(`Skill available at ${skillDirectory}`.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+    );
   });
 
   test('removeSkill confirms before deleting the skill directory', async () => {

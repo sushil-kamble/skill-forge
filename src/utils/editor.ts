@@ -23,9 +23,7 @@ interface EditorDependencies {
   resolveExecutable?: (command: string) => Promise<string | null>;
 }
 
-async function resolveEditorCommand(
-  dependencies: EditorDependencies = {},
-): Promise<string | null> {
+async function resolveEditorCommand(dependencies: EditorDependencies = {}): Promise<string | null> {
   const env = dependencies.env ?? process.env;
   const resolve = dependencies.resolveExecutable ?? resolveExecutable;
 

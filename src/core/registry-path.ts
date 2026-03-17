@@ -1,6 +1,7 @@
 import type { SkillForgeConfig } from '../types/config.js';
 
-export const INITIALIZATION_MESSAGE = 'skill-forge not initialized. Run `skill-forge init` to get started.';
+export const INITIALIZATION_MESSAGE =
+  'skill-forge not initialized. Run `skill-forge init` to get started.';
 
 export function isInitializedConfig(config: SkillForgeConfig): boolean {
   return (

@@ -26,7 +26,11 @@ export interface GitHubService {
   validateToken(token: string): Promise<ValidatedGitHubToken>;
   createSkillsRepository(token: string): Promise<RegistryRepository>;
   getRepository(token: string, repoUrl: string): Promise<RegistryRepository>;
-  getRepositoryStatus(token: string, owner: string, repo: string): Promise<RegistryRepositoryStatus>;
+  getRepositoryStatus(
+    token: string,
+    owner: string,
+    repo: string,
+  ): Promise<RegistryRepositoryStatus>;
 }
 
 class InvalidGitHubRepositoryUrlError extends Error {}
@@ -266,7 +270,11 @@ export const githubService: GitHubService = {
     }
   },
 
-  async getRepositoryStatus(token: string, owner: string, repo: string): Promise<RegistryRepositoryStatus> {
+  async getRepositoryStatus(
+    token: string,
+    owner: string,
+    repo: string,
+  ): Promise<RegistryRepositoryStatus> {
     try {
       return await fetchRepositoryStatus(token, owner, repo);
     } catch (error) {

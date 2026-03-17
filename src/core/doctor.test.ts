@@ -45,17 +45,21 @@ function createSkillCreatorStub(options?: {
     },
     async detectAvailability() {
       return {
-        availableAgents: (options?.availability?.availableAgents ?? []) as Array<'claude-code' | 'opencode' | 'codex'>,
-        missingAgents: (options?.availability?.missingAgents ?? []) as Array<'claude-code' | 'opencode' | 'codex'>,
-        unverifiedAgents: (options?.availability?.unverifiedAgents ?? []) as Array<'claude-code' | 'opencode' | 'codex'>,
+        availableAgents: (options?.availability?.availableAgents ?? []) as Array<
+          'claude-code' | 'opencode' | 'codex'
+        >,
+        missingAgents: (options?.availability?.missingAgents ?? []) as Array<
+          'claude-code' | 'opencode' | 'codex'
+        >,
+        unverifiedAgents: (options?.availability?.unverifiedAgents ?? []) as Array<
+          'claude-code' | 'opencode' | 'codex'
+        >,
       };
     },
   };
 }
 
-function createGitHubStub(options?: {
-  validateToken?: () => Promise<void>;
-}): GitHubService {
+function createGitHubStub(options?: { validateToken?: () => Promise<void> }): GitHubService {
   return {
     async validateToken() {
       if (options?.validateToken) {
@@ -112,7 +116,10 @@ describe('doctor checks', () => {
     });
 
     assert.equal(result.ok, true);
-    assert.equal(result.checks.every((check) => check.status === 'pass'), true);
+    assert.equal(
+      result.checks.every((check) => check.status === 'pass'),
+      true,
+    );
     assert.match(logs.join('\n'), /PASS Config file/);
     assert.match(logs.join('\n'), /PASS npx/);
     assert.match(logs.join('\n'), /PASS skill-creator/);
@@ -123,13 +130,14 @@ describe('doctor checks', () => {
     const result = await runDoctor({
       configFilePath: '/tmp/missing.json',
       github: createGitHubStub(),
-      loadConfig: async () => createConfig({
-        githubToken: '',
-        githubUsername: '',
-        registryRepoUrl: '',
-        localRegistryPath: null,
-        registryRepoName: null,
-      }),
+      loadConfig: async () =>
+        createConfig({
+          githubToken: '',
+          githubUsername: '',
+          registryRepoUrl: '',
+          localRegistryPath: null,
+          registryRepoName: null,
+        }),
       logger: createRecordingLogger(logs),
       pathExists: async () => false,
       readFile: async () => {
@@ -178,7 +186,10 @@ describe('doctor checks', () => {
       }),
     });
 
-    assert.equal(result.checks.find((check) => check.label === 'GitHub token')?.status, 'unreachable');
+    assert.equal(
+      result.checks.find((check) => check.label === 'GitHub token')?.status,
+      'unreachable',
+    );
   });
 
   test('runDoctor reads config once on a healthy initialized setup', async () => {
@@ -240,8 +251,14 @@ describe('doctor checks', () => {
     });
 
     assert.equal(result.ok, true);
-    assert.equal(result.checks.find((check) => check.label === 'skill-creator')?.status, 'recommended');
+    assert.equal(
+      result.checks.find((check) => check.label === 'skill-creator')?.status,
+      'recommended',
+    );
     assert.match(logs.join('\n'), /RECOMMENDED skill-creator/);
-    assert.match(logs.join('\n'), /Recommended install: npx skills add https:\/\/github\.com\/anthropics\/skills --skill skill-creator -g -a claude-code -a opencode -a codex/);
+    assert.match(
+      logs.join('\n'),
+      /Recommended install: npx skills add https:\/\/github\.com\/anthropics\/skills --skill skill-creator -g -a claude-code -a opencode -a codex/,
+    );
   });
 });
