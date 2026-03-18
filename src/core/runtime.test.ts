@@ -46,6 +46,17 @@ describe('runtime guards', () => {
     );
   });
 
+  test('ensureCommandInitialization allows commands when token is empty but setup is complete', async () => {
+    await assert.doesNotReject(() =>
+      ensureCommandInitialization('list', async () =>
+        createConfig({
+          githubToken: '',
+          githubUsername: '',
+        }),
+      ),
+    );
+  });
+
   test('ensureCommandInitialization allows init and doctor without config', async () => {
     await assert.doesNotReject(() =>
       ensureCommandInitialization('init', async () =>

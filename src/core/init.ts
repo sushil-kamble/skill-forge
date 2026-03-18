@@ -5,7 +5,12 @@ import { confirm, input, password, select } from '@inquirer/prompts';
 
 import { loadConfig, saveConfig } from './config.js';
 import { gitService, type GitService } from './git.js';
-import { githubService, type GitHubService, type RegistryRepository } from './github.js';
+import {
+  githubService,
+  RepositoryAlreadyExistsError,
+  type GitHubService,
+  type RegistryRepository,
+} from './github.js';
 import { isInitializedConfig } from './registry-path.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { logger, type Logger } from '../utils/logger.js';
@@ -76,21 +81,37 @@ function getConfiguredLocalRegistryPath(
 }
 
 async function promptForGitHubToken(
+  existingConfig: SkillPodConfig,
   prompts: PromptService,
   github: GitHubService,
   log: Logger,
   spin: SpinnerFactory,
-): Promise<{ githubToken: string; githubUsername: string }> {
+): Promise<{ githubToken: string; githubUsername: string } | null> {
+  if (existingConfig.githubToken.length > 0 && existingConfig.githubUsername.length > 0) {
+    const tokenSpinner = spin.create(
+      `Validating saved token for @${existingConfig.githubUsername}...`,
+    );
+    tokenSpinner.start();
+
+    try {
+      const validated = await github.validateToken(existingConfig.githubToken);
+      tokenSpinner.succeed(`Authenticated as @${validated.githubUsername}`);
+      return { githubToken: validated.githubToken, githubUsername: validated.githubUsername };
+    } catch {
+      tokenSpinner.fail('Saved token is no longer valid');
+    }
+  }
+
   for (let attempt = 1; attempt <= MAX_TOKEN_ATTEMPTS; attempt += 1) {
     const githubToken = (
       await prompts.password(
-        `GitHub Personal Access Token (repo scope required). Create one at ${TOKEN_HELP_URL}`,
+        `GitHub Personal Access Token (repo scope required). Create one at ${TOKEN_HELP_URL}\n  Press Enter to skip`,
       )
     ).trim();
 
     if (githubToken.length === 0) {
-      log.error('A GitHub token is required.');
-      continue;
+      log.warn('Skipping GitHub authentication. Some features will require a token later.');
+      return null;
     }
 
     const tokenSpinner = spin.create('Validating token...');
@@ -98,7 +119,7 @@ async function promptForGitHubToken(
 
     try {
       const validatedToken = await github.validateToken(githubToken);
-      tokenSpinner.succeed('Token validated');
+      tokenSpinner.succeed(`Authenticated as @${validatedToken.githubUsername}`);
       return {
         githubToken: validatedToken.githubToken,
         githubUsername: validatedToken.githubUsername,
@@ -108,17 +129,26 @@ async function promptForGitHubToken(
       log.error(getErrorMessage(error));
 
       if (attempt < MAX_TOKEN_ATTEMPTS) {
-        log.warn(`Token validation failed. ${MAX_TOKEN_ATTEMPTS - attempt} attempt(s) remaining.`);
+        log.warn(`${MAX_TOKEN_ATTEMPTS - attempt} attempt(s) remaining. Press Enter to skip.`);
       }
     }
   }
 
   throw new Error(
-    `Unable to validate your GitHub token after ${MAX_TOKEN_ATTEMPTS} attempts. Create a Personal Access Token with the "repo" scope and run "skillpod init" again.`,
+    `Unable to validate your GitHub token after ${MAX_TOKEN_ATTEMPTS} attempts. Run "skillpod init" again.`,
   );
 }
 
-async function promptForRepositoryMode(prompts: PromptService): Promise<RegistrySetupMode> {
+async function promptForRepositoryMode(
+  prompts: PromptService,
+  hasToken: boolean,
+  log: Logger,
+): Promise<RegistrySetupMode> {
+  if (!hasToken) {
+    log.info('GitHub token not configured — using manual repository setup.');
+    return 'manual';
+  }
+
   return prompts.select<RegistrySetupMode>('How would you like to set up your registry?', [
     { name: 'Auto-create a public GitHub repo named "skills"', value: 'auto' },
     { name: 'Point at an existing GitHub repository', value: 'manual' },
@@ -129,11 +159,12 @@ async function promptForRepository(
   mode: RegistrySetupMode,
   prompts: PromptService,
   github: GitHubService,
-  githubToken: string,
+  githubToken: string | null,
+  githubUsername: string | null,
   log: Logger,
   spin: SpinnerFactory,
 ): Promise<RegistryRepository> {
-  if (mode === 'auto') {
+  if (mode === 'auto' && githubToken) {
     const repoSpinner = spin.create('Creating skills repository...');
     repoSpinner.start();
 
@@ -142,8 +173,25 @@ async function promptForRepository(
       repoSpinner.succeed('Repository created');
       return repo;
     } catch (error) {
-      repoSpinner.fail('Failed to create repository');
-      throw error;
+      if (error instanceof RepositoryAlreadyExistsError && githubUsername) {
+        repoSpinner.warn('Repository "skills" already exists on your account');
+
+        const useExisting = await prompts.confirm('Use your existing "skills" repository?', true);
+
+        if (useExisting) {
+          const existingRepo = await github.getRepository(
+            githubToken,
+            `https://github.com/${githubUsername}/skills`,
+          );
+          log.success(`Using existing repository: ${existingRepo.htmlUrl}`);
+          return existingRepo;
+        }
+
+        // User declined — fall through to manual URL entry below
+      } else {
+        repoSpinner.fail('Failed to create repository');
+        throw error;
+      }
     }
   }
 
@@ -155,7 +203,11 @@ async function promptForRepository(
     ).trim();
 
     try {
-      return await github.getRepository(githubToken, repoUrl);
+      if (githubToken) {
+        return await github.getRepository(githubToken, repoUrl);
+      }
+
+      return github.resolveRepositoryFromUrl(repoUrl);
     } catch (error) {
       log.error(getErrorMessage(error));
 
@@ -250,11 +302,22 @@ export async function initializeSkillPod(
   }
 
   log.info(stepLabel(1, 4, 'GitHub authentication'));
-  const { githubToken, githubUsername } = await promptForGitHubToken(prompts, github, log, spin);
+  const tokenResult = await promptForGitHubToken(existingConfig, prompts, github, log, spin);
+  const githubToken = tokenResult?.githubToken ?? '';
+  const githubUsername = tokenResult?.githubUsername ?? '';
 
   log.info(stepLabel(2, 4, 'Repository setup'));
-  const setupMode = await promptForRepositoryMode(prompts);
-  const repository = await promptForRepository(setupMode, prompts, github, githubToken, log, spin);
+  const setupMode = await promptForRepositoryMode(prompts, githubToken.length > 0, log);
+  const repository = await promptForRepository(
+    setupMode,
+    prompts,
+    github,
+    githubToken || null,
+    githubUsername || null,
+    log,
+    spin,
+  );
+  const effectiveUsername = githubUsername || repository.owner;
   const localRegistryPath = getConfiguredLocalRegistryPath(
     existingConfig,
     resolveLocalRegistryPath,
@@ -263,12 +326,12 @@ export async function initializeSkillPod(
   log.info(stepLabel(3, 4, 'Cloning registry'));
   await prepareLocalRegistryPath(localRegistryPath, git, alreadyInitialized);
   await cloneRegistryRepository(repository, localRegistryPath, git, spin);
-  await git.ensureSkillsDirectory(localRegistryPath, githubUsername);
+  await git.ensureSkillsDirectory(localRegistryPath, effectiveUsername);
 
   log.info(stepLabel(4, 4, 'Saving configuration'));
   const savedConfig = await writeConfig({
     githubToken,
-    githubUsername,
+    githubUsername: effectiveUsername,
     registryRepoUrl: repository.htmlUrl,
     localRegistryPath,
     registryRepoName: REPOSITORY_NAME,

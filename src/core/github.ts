@@ -26,6 +26,7 @@ export interface GitHubService {
   validateToken(token: string): Promise<ValidatedGitHubToken>;
   createSkillsRepository(token: string): Promise<RegistryRepository>;
   getRepository(token: string, repoUrl: string): Promise<RegistryRepository>;
+  resolveRepositoryFromUrl(repoUrl: string): RegistryRepository;
   getRepositoryStatus(
     token: string,
     owner: string,
@@ -36,6 +37,13 @@ export interface GitHubService {
 
 class InvalidGitHubRepositoryUrlError extends Error {}
 class InsufficientGitHubScopeError extends Error {}
+
+export class RepositoryAlreadyExistsError extends Error {
+  constructor(repoName: string) {
+    super(`A repository named "${repoName}" already exists on your account.`);
+    this.name = 'RepositoryAlreadyExistsError';
+  }
+}
 
 interface GitHubRequestError extends Error {
   status?: number;
@@ -251,9 +259,7 @@ export const githubService: GitHubService = {
       const requestError = toGitHubRequestError(error);
 
       if (requestError !== null && requestError.status === 422) {
-        throw new Error(
-          'A repository named "skills" already exists on your account. Choose the manual option to point skillpod at it instead.',
-        );
+        throw new RepositoryAlreadyExistsError('skills');
       }
 
       throw new Error(formatGitHubError(error));
@@ -269,6 +275,17 @@ export const githubService: GitHubService = {
     } catch (error) {
       throw new Error(formatGitHubError(error));
     }
+  },
+
+  resolveRepositoryFromUrl(repoUrl: string): RegistryRepository {
+    const { owner, repo } = parseGitHubRepoUrl(repoUrl);
+
+    return {
+      cloneUrl: `https://github.com/${owner}/${repo}.git`,
+      htmlUrl: `https://github.com/${owner}/${repo}`,
+      owner,
+      repo,
+    };
   },
 
   async getRepositoryStatus(

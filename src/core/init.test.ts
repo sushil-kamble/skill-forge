@@ -7,7 +7,11 @@ import { simpleGit } from 'simple-git';
 
 import { gitService } from './git.js';
 import { initializeSkillPod, type PromptChoice, type PromptService } from './init.js';
-import type { RegistryRepository, GitHubService } from './github.js';
+import {
+  RepositoryAlreadyExistsError,
+  type RegistryRepository,
+  type GitHubService,
+} from './github.js';
 import type { SkillPodConfig } from '../types/config.js';
 import {
   createSilentLogger,
@@ -130,6 +134,7 @@ function createGitHubStub(options: {
   validateToken?: (token: string) => Promise<{ githubToken: string; githubUsername: string }>;
   createSkillsRepository?: (token: string) => Promise<RegistryRepository>;
   getRepository?: (token: string, repoUrl: string) => Promise<RegistryRepository>;
+  resolveRepositoryFromUrl?: (repoUrl: string) => RegistryRepository;
 }): GitHubService {
   return {
     validateToken:
@@ -141,13 +146,18 @@ function createGitHubStub(options: {
       })),
     createSkillsRepository:
       options.createSkillsRepository ??
-      (async () => {
+      (() => {
         throw new Error('createSkillsRepository was not configured.');
       }),
     getRepository:
       options.getRepository ??
       (async () => {
         throw new Error('getRepository was not configured.');
+      }),
+    resolveRepositoryFromUrl:
+      options.resolveRepositoryFromUrl ??
+      (() => {
+        throw new Error('resolveRepositoryFromUrl was not configured.');
       }),
   };
 }
@@ -338,5 +348,160 @@ describe('initializeSkillPod', () => {
 
     assert.equal(result.status, 'cancelled');
     assert.equal(configStore.savedConfig, null);
+  });
+
+  test('reuses saved token from config without re-prompting for password', async () => {
+    const remotePath = await createRemoteRepository('skills');
+    const localRegistryPath = path.join(await makeTempDir('skillpod-reuse-'), 'registry');
+    let validateCalledWith = '';
+    const prompts = new PromptStub({
+      select: ['auto'],
+    });
+    const configStore = createConfigStore({
+      githubToken: 'saved-token',
+      githubUsername: 'octocat',
+    });
+    const github = createGitHubStub({
+      validateToken: async (token: string) => {
+        validateCalledWith = token;
+        return { githubToken: token, githubUsername: 'octocat', scopes: ['repo'] };
+      },
+      createSkillsRepository: async () => ({
+        cloneUrl: remotePath,
+        htmlUrl: 'https://github.com/octocat/skills',
+        owner: 'octocat',
+        repo: 'skills',
+      }),
+    });
+
+    const result = await initializeSkillPod({
+      prompts,
+      github,
+      git: gitService,
+      logger: createSilentLogger(),
+      loadConfig: configStore.loadConfig,
+      saveConfig: configStore.saveConfig,
+      getLocalRegistryPath: () => localRegistryPath,
+      spinner: createSilentSpinnerFactory(),
+    });
+
+    assert.equal(result.status, 'completed');
+    assert.equal(validateCalledWith, 'saved-token');
+    assert.equal(configStore.savedConfig?.githubToken, 'saved-token');
+  });
+
+  test('auto-create recovers when repository already exists', async () => {
+    const remotePath = await createRemoteRepository('skills');
+    const localRegistryPath = path.join(await makeTempDir('skillpod-exists-'), 'registry');
+    const prompts = new PromptStub({
+      password: ['valid-token'],
+      select: ['auto'],
+      confirm: [true],
+    });
+    const configStore = createConfigStore();
+    const github = createGitHubStub({
+      createSkillsRepository: async () => {
+        throw new RepositoryAlreadyExistsError('skills');
+      },
+      getRepository: async (_token, repoUrl) => {
+        assert.equal(repoUrl, 'https://github.com/octocat/skills');
+        return {
+          cloneUrl: remotePath,
+          htmlUrl: 'https://github.com/octocat/skills',
+          owner: 'octocat',
+          repo: 'skills',
+        };
+      },
+    });
+
+    const result = await initializeSkillPod({
+      prompts,
+      github,
+      git: gitService,
+      logger: createSilentLogger(),
+      loadConfig: configStore.loadConfig,
+      saveConfig: configStore.saveConfig,
+      getLocalRegistryPath: () => localRegistryPath,
+      spinner: createSilentSpinnerFactory(),
+    });
+
+    assert.equal(result.status, 'completed');
+    assert.equal(configStore.savedConfig?.registryRepoUrl, 'https://github.com/octocat/skills');
+  });
+
+  test('auto-create falls through to manual entry when user declines existing repo', async () => {
+    const remotePath = await createRemoteRepository('other-skills');
+    const localRegistryPath = path.join(await makeTempDir('skillpod-decline-'), 'registry');
+    const prompts = new PromptStub({
+      password: ['valid-token'],
+      select: ['auto'],
+      confirm: [false],
+      input: ['https://github.com/octocat/other-skills'],
+    });
+    const configStore = createConfigStore();
+    const github = createGitHubStub({
+      createSkillsRepository: async () => {
+        throw new RepositoryAlreadyExistsError('skills');
+      },
+      getRepository: async (_token, repoUrl) => {
+        return {
+          cloneUrl: remotePath,
+          htmlUrl: repoUrl,
+          owner: 'octocat',
+          repo: 'other-skills',
+        };
+      },
+    });
+
+    const result = await initializeSkillPod({
+      prompts,
+      github,
+      git: gitService,
+      logger: createSilentLogger(),
+      loadConfig: configStore.loadConfig,
+      saveConfig: configStore.saveConfig,
+      getLocalRegistryPath: () => localRegistryPath,
+      spinner: createSilentSpinnerFactory(),
+    });
+
+    assert.equal(result.status, 'completed');
+    assert.equal(
+      configStore.savedConfig?.registryRepoUrl,
+      'https://github.com/octocat/other-skills',
+    );
+  });
+
+  test('token can be skipped for manual repository setup', async () => {
+    const remotePath = await createRemoteRepository('skills');
+    const localRegistryPath = path.join(await makeTempDir('skillpod-skip-'), 'registry');
+    const prompts = new PromptStub({
+      password: [''],
+      input: ['https://github.com/octocat/skills'],
+    });
+    const configStore = createConfigStore();
+    const github = createGitHubStub({
+      resolveRepositoryFromUrl: (repoUrl: string) => ({
+        cloneUrl: remotePath,
+        htmlUrl: repoUrl,
+        owner: 'octocat',
+        repo: 'skills',
+      }),
+    });
+
+    const result = await initializeSkillPod({
+      prompts,
+      github,
+      git: gitService,
+      logger: createSilentLogger(),
+      loadConfig: configStore.loadConfig,
+      saveConfig: configStore.saveConfig,
+      getLocalRegistryPath: () => localRegistryPath,
+      spinner: createSilentSpinnerFactory(),
+    });
+
+    assert.equal(result.status, 'completed');
+    assert.equal(configStore.savedConfig?.githubToken, '');
+    assert.equal(configStore.savedConfig?.githubUsername, 'octocat');
+    assert.equal(configStore.savedConfig?.registryRepoUrl, 'https://github.com/octocat/skills');
   });
 });

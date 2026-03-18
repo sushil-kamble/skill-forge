@@ -5,8 +5,6 @@ export const INITIALIZATION_MESSAGE =
 
 export function isInitializedConfig(config: SkillPodConfig): boolean {
   return (
-    config.githubToken.length > 0 &&
-    config.githubUsername.length > 0 &&
     config.registryRepoUrl.length > 0 &&
     config.localRegistryPath !== null &&
     config.registryRepoName !== null
