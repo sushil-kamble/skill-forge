@@ -4,7 +4,6 @@
   "description": "CLI for authoring and managing personal agent skills registries.",
   "type": "module",
   "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "bin": {
     "skillpod": "./dist/index.js"
   },
