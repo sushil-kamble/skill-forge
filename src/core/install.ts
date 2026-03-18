@@ -159,9 +159,7 @@ async function selectRemoteSkill(
   );
 
   if (remoteSkills.length === 0) {
-    log.info(
-      'No skills found in the remote registry. Create one with "skillpod create <name>".',
-    );
+    log.info('No skills found in the remote registry. Create one with "skillpod create <name>".');
     return null;
   }
 
