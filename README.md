@@ -25,6 +25,7 @@ Authoring agent skills by hand gets messy fast. Files drift, repos become ad hoc
 - `pull` shows remote skills and lets you pull them locally
 - `install` lets you pick a remote skill and install it into your agents via `npx skills add ...`
 - `doctor` gives you a quick health check when something is off
+- `unload` cleanly removes all local config, credentials, and the registry clone when you're done
 
 ## Features
 
@@ -36,6 +37,10 @@ Authoring agent skills by hand gets messy fast. Files drift, repos become ad hoc
 - Optional `skill-creator` assisted authoring with clipboard copy and `<input>` tag for user context
 - Compatible with the `skills` / `skills.sh` ecosystem
 - Spinners, icons, and relative timestamps for a polished terminal experience
+- GitHub token is saved locally and reused across sessions — no re-entering on every run
+- GitHub authentication is optional during init for a lighter setup
+- Auto-create gracefully handles existing repositories instead of failing
+- Clean unload to remove all local state without touching remote repos
 - Production-ready guards for init state, Node version, git state, and token validation
 
 ## Install
@@ -116,6 +121,14 @@ If something looks broken:
 skillpod doctor
 ```
 
+To remove skillpod from your machine (config, credentials, local registry):
+
+```bash
+skillpod unload
+```
+
+This does not touch your remote GitHub repository.
+
 ## Typical Workflow
 
 ```bash
@@ -147,6 +160,7 @@ skillpod remove [name]
 skillpod push [-m "message"]
 skillpod pull
 skillpod install [--list] [--skill <name>]... [-g] [-a <agent>] [-y] [--copy]
+skillpod unload
 ```
 
 ## Authoring Modes
@@ -189,11 +203,21 @@ That makes it practical to keep instructions, references, examples, and helper s
 
 `skillpod init` will:
 
-- validate your GitHub Personal Access Token
-- create or connect to a GitHub repo
+- ask for a GitHub Personal Access Token (optional — press Enter to skip for a lighter setup)
+- reuse a saved token from a previous session if one exists
+- create or connect to a GitHub repo (auto-create recovers gracefully if the repo already exists)
 - clone that repo locally
 - ensure a `skills/` directory exists
 - store your local config in `~/.skillpod/config.json`
+
+## Unload
+
+`skillpod unload` cleanly removes all local skillpod state:
+
+- `~/.skillpod/` config directory (including your stored GitHub token)
+- the local registry clone
+
+Your remote GitHub repository is **not** affected. You'll be asked to confirm before anything is deleted. Run `skillpod init` to set up again.
 
 ## Install Bridge
 
