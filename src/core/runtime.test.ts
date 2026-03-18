@@ -24,9 +24,10 @@ describe('runtime guards', () => {
     assert.throws(() => assertSupportedNodeVersion('18.20.0'), /requires Node\.js 20 or newer/);
   });
 
-  test('commandRequiresInitialization exempts init and doctor', () => {
+  test('commandRequiresInitialization exempts init, doctor, and unload', () => {
     assert.equal(commandRequiresInitialization('init'), false);
     assert.equal(commandRequiresInitialization('doctor'), false);
+    assert.equal(commandRequiresInitialization('unload'), false);
     assert.equal(commandRequiresInitialization('list'), true);
   });
 
@@ -57,28 +58,23 @@ describe('runtime guards', () => {
     );
   });
 
-  test('ensureCommandInitialization allows init and doctor without config', async () => {
+  test('ensureCommandInitialization allows init, doctor, and unload without config', async () => {
+    const emptyConfig = {
+      githubToken: '',
+      githubUsername: '',
+      registryRepoUrl: '',
+      localRegistryPath: null as string | null,
+      registryRepoName: null as string | null,
+    };
+
     await assert.doesNotReject(() =>
-      ensureCommandInitialization('init', async () =>
-        createConfig({
-          githubToken: '',
-          githubUsername: '',
-          registryRepoUrl: '',
-          localRegistryPath: null,
-          registryRepoName: null,
-        }),
-      ),
+      ensureCommandInitialization('init', async () => createConfig(emptyConfig)),
     );
     await assert.doesNotReject(() =>
-      ensureCommandInitialization('doctor', async () =>
-        createConfig({
-          githubToken: '',
-          githubUsername: '',
-          registryRepoUrl: '',
-          localRegistryPath: null,
-          registryRepoName: null,
-        }),
-      ),
+      ensureCommandInitialization('doctor', async () => createConfig(emptyConfig)),
+    );
+    await assert.doesNotReject(() =>
+      ensureCommandInitialization('unload', async () => createConfig(emptyConfig)),
     );
   });
 });

@@ -3,7 +3,7 @@ import { INITIALIZATION_MESSAGE, isInitializedConfig } from './registry-path.js'
 import type { SkillPodConfig } from '../types/config.js';
 
 const MINIMUM_NODE_MAJOR = 20;
-const INITIALIZATION_EXEMPT_COMMANDS = new Set(['doctor', 'help', 'init']);
+const INITIALIZATION_EXEMPT_COMMANDS = new Set(['doctor', 'help', 'init', 'unload']);
 
 export function assertSupportedNodeVersion(version = process.versions.node): void {
   const majorVersion = Number.parseInt(version.split('.')[0] ?? '0', 10);
