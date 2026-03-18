@@ -21,7 +21,7 @@ function createConfig(overrides: Partial<SkillPodConfig> = {}): SkillPodConfig {
 
 describe('runtime guards', () => {
   test('assertSupportedNodeVersion rejects unsupported Node.js versions', () => {
-    assert.throws(() => assertSupportedNodeVersion('16.20.0'), /requires Node\.js 18 or newer/);
+    assert.throws(() => assertSupportedNodeVersion('18.20.0'), /requires Node\.js 20 or newer/);
   });
 
   test('commandRequiresInitialization exempts init and doctor', () => {

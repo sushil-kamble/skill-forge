@@ -40,7 +40,7 @@ Authoring agent skills by hand gets messy fast. Files drift, repos become ad hoc
 
 ## Install
 
-Node.js `18+` is required.
+Node.js `20+` is required.
 
 For the best authoring experience, make sure the VS Code shell command is available as `code`.
 
