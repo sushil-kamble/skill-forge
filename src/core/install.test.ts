@@ -265,10 +265,7 @@ describe('install bridge', () => {
     assert.equal(env?.['GITHUB_TOKEN'], 'ghp_secret');
     assert.equal(env?.['GH_TOKEN'], 'ghp_secret');
     assert.equal(env?.['GIT_CONFIG_COUNT'], '1');
-    assert.equal(
-      env?.['GIT_CONFIG_KEY_0'],
-      'url.https://ghp_secret@github.com/.insteadOf',
-    );
+    assert.equal(env?.['GIT_CONFIG_KEY_0'], 'url.https://ghp_secret@github.com/.insteadOf');
     assert.equal(env?.['GIT_CONFIG_VALUE_0'], 'https://github.com/');
   });
 
