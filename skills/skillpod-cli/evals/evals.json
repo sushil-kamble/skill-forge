@@ -1,0 +1,38 @@
+{
+  "skill_name": "skillpod-cli",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I want to start managing my agent skills in a GitHub-backed registry. I already have a GitHub PAT. Walk me through the initial setup and creating my first skill.",
+      "expected_output": "Agent runs `skillpod init` to set up the registry, then `skillpod create <name>` to scaffold a new skill, and explains the authoring options.",
+      "files": [],
+      "expectations": [
+        "Agent uses `skillpod init` as the first step",
+        "Agent uses `skillpod create` to scaffold a new skill after init",
+        "Agent mentions the authoring mode options (VS Code, skill-creator, skip)"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I made some changes to my 'code-review' skill locally. Now I want to push it to GitHub and install it into claude-code globally.",
+      "expected_output": "Agent runs `skillpod push` to sync changes to GitHub, then `skillpod install --skill code-review -g -a claude-code` to install it.",
+      "files": [],
+      "expectations": [
+        "Agent uses `skillpod push` to push changes to GitHub",
+        "Agent uses `skillpod install` with correct flags: --skill code-review, -g, -a claude-code",
+        "Agent runs push before install"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Something seems off with my skillpod setup — my token might be expired and I'm not sure if my remote repo is still reachable. Can you check?",
+      "expected_output": "Agent runs `skillpod doctor` to diagnose the setup, then interprets the results and suggests fixes for any failing checks.",
+      "files": [],
+      "expectations": [
+        "Agent runs `skillpod doctor` as the diagnostic step",
+        "Agent interprets the output and explains what each check means",
+        "Agent suggests remediation if checks fail (e.g., re-run `skillpod init` to update token)"
+      ]
+    }
+  ]
+}
