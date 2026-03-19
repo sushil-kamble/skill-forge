@@ -33,24 +33,28 @@ Interactive list of all local skills showing name, description, modification tim
 sync status. Selecting a skill opens the edit menu.
 
 ### `skillpod remove [name]`
-Delete a skill. Interactive picker if name is omitted.
+Delete a skill. Interactive picker if name is omitted. Supports fuzzy name matching.
+After deletion, prompts whether to push the removal to remote.
 
 ### `skillpod push [-m <message>]`
-Push local skill changes to the remote GitHub registry. Shows push status per skill.
-Select individual skills or push all.
+Push local skill changes to the remote GitHub registry. Always shows an interactive
+prompt to select which skills to push (individual, all, or cancel). The `-m` flag
+only overrides the commit message — it does not skip the selection prompt.
 
 ### `skillpod pull`
-Pull skills from remote. Shows sync status. Select individual skills or pull all.
+Pull skills from remote. Always shows an interactive prompt to select which skills
+to pull (individual, all, or cancel).
 
 ### `skillpod install [options]`
 Install skills into agent environments. Delegates to `npx skills add`.
+If no `--skill` or `--list` flag is given, prompts interactively to select a skill.
 
 Options:
-- `--list` — list available skills
-- `--skill <name>` — install specific skill (repeatable)
+- `--list` — list available skills from registry
+- `--skill <name>` — install specific skill (repeatable, skips prompt)
 - `-g, --global` — install at user scope
 - `-a, --agent <agent>` — target agent (repeatable)
-- `-y, --yes` — skip confirmation
+- `-y, --yes` — skip confirmation prompts
 - `--copy` — copy files instead of symlinking
 
 Example: `skillpod install --skill api-review -g -a claude-code`
@@ -74,18 +78,24 @@ remote GitHub repo. Requires confirmation.
 skillpod init
 skillpod create my-skill
 # author the skill
-skillpod push
+skillpod push                # interactive: select skill(s) to push
 skillpod install --skill my-skill -g -a claude-code
 ```
 
 **Pull and edit an existing skill:**
 ```bash
-skillpod pull
+skillpod pull                # interactive: select skill(s) to pull
 skillpod edit my-skill
-skillpod push -m "improve error handling guidance"
+skillpod push                # interactive: select skill(s) to push
 ```
 
 **Health check:**
 ```bash
 skillpod doctor
 ```
+
+## Important: Interactive Prompts
+
+Most commands use interactive prompts (powered by Inquirer). `push`, `pull`, `remove`,
+`list`, and `install` (without `--skill`) always require user selection. These commands
+cannot be fully automated in a non-interactive shell.
