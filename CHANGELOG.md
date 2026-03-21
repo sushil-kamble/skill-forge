@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-03-22
+
+### Added
+
+- `send` command to publish a local skill directory directly into the registry — validates `SKILL.md` frontmatter, copies all files, and auto-pushes to remote.
+- Runtime guards: Node.js version check (≥ 20) and initialization gate that blocks commands requiring config before `init` has been run.
+- `--yes` flag on `unload` to skip the confirmation prompt in non-interactive environments.
+
+### Changed
+
+- Internal source reorganized into `src/core/agent-skill/` and `src/core/global/` sub-trees for cleaner separation of concerns.
+- `unload` now correctly resolves the local registry path before deletion.
+
 ## [0.2.3] - 2026-03-19
 
 ### Added
