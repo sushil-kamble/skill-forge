@@ -43,14 +43,18 @@ export interface SkillSummary {
 
 export interface CreateSkillOptions {
   name?: string;
+  mode?: AuthoringMode;
 }
 
 export interface EditSkillOptions {
   name?: string;
+  mode?: AuthoringMode;
 }
 
 export interface RemoveSkillOptions {
   name?: string;
+  yes?: boolean;
+  push?: boolean;
 }
 
 export interface SkillCommandDependencies {
@@ -64,11 +68,11 @@ export interface SkillCommandDependencies {
   getLocalChanges?: (localRegistryPath: string, skillName: string) => Promise<boolean>;
 }
 
-type AuthoringMode = 'open-vscode' | 'skip' | 'use-skill-creator';
+export type AuthoringMode = 'open-vscode' | 'skip' | 'use-skill-creator';
 
-async function defaultPushToRemote(message: string): Promise<boolean> {
+async function defaultPushToRemote(_message: string): Promise<boolean> {
   try {
-    const result = await pushRegistry({ message });
+    const result = await pushRegistry({ all: true });
     return result.status === 'pushed';
   } catch {
     return false;
@@ -178,6 +182,16 @@ function getSkillFilePath(localRegistryPath: string, name: string): string {
 function validateSkillName(name: string): string | null {
   if (!SKILL_NAME_PATTERN.test(name)) {
     return 'Skill name must be lowercase, use hyphens only, and contain no spaces or special characters.';
+  }
+
+  return null;
+}
+
+const VALID_AUTHORING_MODES: readonly AuthoringMode[] = ['open-vscode', 'skip', 'use-skill-creator'];
+
+function validateAuthoringMode(mode: string): string | null {
+  if (!VALID_AUTHORING_MODES.includes(mode as AuthoringMode)) {
+    return `Invalid --mode "${mode}". Valid values: ${VALID_AUTHORING_MODES.join(', ')}.`;
   }
 
   return null;
@@ -583,21 +597,25 @@ export async function createSkill(
     throw new Error(validationError);
   }
 
+  if (options.mode !== undefined) {
+    const modeError = validateAuthoringMode(options.mode);
+    if (modeError) throw new Error(modeError);
+  }
+
   const skillDirectory = getSkillDirectory(localRegistryPath, requestedName);
   const skillFilePath = getSkillFilePath(localRegistryPath, requestedName);
 
   if (await pathExists(skillDirectory)) {
-    const shouldOpen = await prompts.confirm(
-      `Skill "${requestedName}" already exists. Open it for editing?`,
-      false,
-    );
+    const shouldOpen =
+      options.mode !== undefined ||
+      (await prompts.confirm(`Skill "${requestedName}" already exists. Open it for editing?`, false));
 
     if (!shouldOpen) {
       log.info('Create cancelled.');
       return;
     }
 
-    const mode = await promptForAuthoringMode(prompts);
+    const mode = options.mode ?? (await promptForAuthoringMode(prompts));
     await handleAuthoringMode(
       {
         action: 'edit',
@@ -621,7 +639,7 @@ export async function createSkill(
   await fs.writeFile(skillFilePath, getDefaultSkillTemplate(requestedName), 'utf8');
   log.success(`Created skill "${requestedName}".`);
 
-  const mode = await promptForAuthoringMode(prompts);
+  const mode = options.mode ?? (await promptForAuthoringMode(prompts));
   await handleAuthoringMode(
     {
       action: 'create',
@@ -640,7 +658,12 @@ export async function createSkill(
   );
 }
 
+export interface ListSkillsOptions {
+  json?: boolean;
+}
+
 export async function listSkills(
+  options: ListSkillsOptions = {},
   dependencies: SkillCommandDependencies = {},
 ): Promise<SkillSummary[]> {
   const prompts = dependencies.prompts ?? skillPrompts;
@@ -655,8 +678,23 @@ export async function listSkills(
   const skills = await getSkillSummaries(localRegistryPath);
 
   if (skills.length === 0) {
-    log.info(EMPTY_STATE_MESSAGE);
+    if (options.json) {
+      log.info('[]');
+    } else {
+      log.info(EMPTY_STATE_MESSAGE);
+    }
     return [];
+  }
+
+  if (options.json) {
+    const output = skills.map((skill) => ({
+      name: skill.name,
+      description: skill.description,
+      path: skill.skillPath,
+      valid: skill.valid,
+    }));
+    log.info(JSON.stringify(output, null, 2));
+    return skills;
   }
 
   const now = new Date();
@@ -729,6 +767,12 @@ export async function editSkill(
   const readConfig = dependencies.loadConfig ?? loadConfig;
   const skillCreator = dependencies.skillCreator ?? skillCreatorService;
   const clipboardCopy = dependencies.copyToClipboard ?? copyToClipboard;
+
+  if (options.mode !== undefined) {
+    const modeError = validateAuthoringMode(options.mode);
+    if (modeError) throw new Error(modeError);
+  }
+
   const config = await readConfig();
   const localRegistryPath = ensureInitializedRegistryPath(config);
   const skills = await getSkillSummaries(localRegistryPath);
@@ -761,7 +805,7 @@ export async function editSkill(
   }
 
   const skillDirectory = getSkillDirectory(localRegistryPath, skillName);
-  const mode = await promptForAuthoringMode(prompts);
+  const mode = options.mode ?? (await promptForAuthoringMode(prompts));
   await handleAuthoringMode(
     {
       action: 'edit',
@@ -826,7 +870,8 @@ export async function removeSkill(
   const skillSummary = await readSkillSummary(localRegistryPath, skillName);
   log.info(`${skillName}: ${truncateText(skillSummary.description, 60)}`);
   log.warn('This cannot be undone locally (but remains in git history).');
-  const shouldRemove = await prompts.confirm(`Remove "${skillName}"?`, false);
+  const shouldRemove =
+    options.yes === true || (await prompts.confirm(`Remove "${skillName}"?`, false));
 
   if (!shouldRemove) {
     log.info('Remove cancelled.');
@@ -836,7 +881,10 @@ export async function removeSkill(
   await fs.rm(skillSummary.skillPath, { recursive: true, force: true });
   log.success(`Removed skill "${skillName}" locally.`);
 
-  const shouldPush = await prompts.confirm('Also push this removal to the remote registry?', false);
+  const shouldPush =
+    options.push === true ||
+    (options.yes !== true &&
+      (await prompts.confirm('Also push this removal to the remote registry?', false)));
 
   if (shouldPush) {
     const pushFn = dependencies.pushToRemote ?? defaultPushToRemote;
@@ -853,6 +901,7 @@ export async function removeSkill(
 export const skillsInternals = {
   DESCRIPTION_FALLBACK,
   EMPTY_STATE_MESSAGE,
+  VALID_AUTHORING_MODES,
   getDefaultSkillTemplate,
   getSkillDirectory,
   getSkillFilePath,
@@ -860,5 +909,6 @@ export const skillsInternals = {
   parseFrontmatter,
   rankSkillNames,
   truncateText,
+  validateAuthoringMode,
   validateSkillName,
 };

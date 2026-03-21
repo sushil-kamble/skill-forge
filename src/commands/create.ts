@@ -1,10 +1,14 @@
 import { Command } from 'commander';
 
-import { createSkill } from '../core/skills.js';
+import { createSkill, type AuthoringMode } from '../core/skills.js';
 
 export const createCommand = new Command('create')
   .description('Create a new skill')
   .argument('[name]', 'Skill name')
-  .action(async (name?: string) => {
-    await createSkill(name ? { name } : {});
+  .option('--mode <mode>', 'Authoring mode: skip, open-vscode, use-skill-creator')
+  .action(async (name: string | undefined, options: { mode?: AuthoringMode }) => {
+    await createSkill({
+      ...(name ? { name } : {}),
+      ...(options.mode ? { mode: options.mode } : {}),
+    });
   });

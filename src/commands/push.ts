@@ -4,7 +4,11 @@ import { pushRegistry } from '../core/registry-git.js';
 
 export const pushCommand = new Command('push')
   .description('Push local skill changes to the remote registry')
-  .option('-m, --message <message>', 'Custom commit message')
-  .action(async (options: { message?: string }) => {
-    await pushRegistry(options.message ? { message: options.message } : {});
+  .option('--skill <name>', 'Push a specific skill (skip interactive selection)')
+  .option('--all', 'Push all changes (skip interactive selection)')
+  .action(async (options: { skill?: string; all?: boolean }) => {
+    await pushRegistry({
+      ...(options.skill ? { skill: options.skill } : {}),
+      ...(options.all ? { all: true } : {}),
+    });
   });

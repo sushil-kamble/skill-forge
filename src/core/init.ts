@@ -273,7 +273,14 @@ async function cloneRegistryRepository(
   }
 }
 
+export interface InitOptions {
+  token?: string;
+  repo?: string;
+  yes?: boolean;
+}
+
 export async function initializeSkillPod(
+  options: InitOptions = {},
   dependencies: InitFlowDependencies = {},
 ): Promise<InitFlowResult> {
   const prompts = dependencies.prompts ?? promptService;
@@ -290,10 +297,9 @@ export async function initializeSkillPod(
   const alreadyInitialized = isInitializedConfig(existingConfig);
 
   if (alreadyInitialized) {
-    const shouldReinitialize = await prompts.confirm(
-      'skillpod is already initialized. Reinitialize?',
-      false,
-    );
+    const shouldReinitialize =
+      options.yes === true ||
+      (await prompts.confirm('skillpod is already initialized. Reinitialize?', false));
 
     if (!shouldReinitialize) {
       log.info('Initialization cancelled.');
@@ -302,21 +308,54 @@ export async function initializeSkillPod(
   }
 
   log.info(stepLabel(1, 4, 'GitHub authentication'));
-  const tokenResult = await promptForGitHubToken(existingConfig, prompts, github, log, spin);
+  let tokenResult: { githubToken: string; githubUsername: string } | null;
+
+  if (options.token) {
+    const tokenSpinner = spin.create('Validating token...');
+    tokenSpinner.start();
+
+    try {
+      const validated = await github.validateToken(options.token);
+      tokenSpinner.succeed(`Authenticated as @${validated.githubUsername}`);
+      tokenResult = { githubToken: validated.githubToken, githubUsername: validated.githubUsername };
+    } catch (error) {
+      tokenSpinner.fail('Token validation failed');
+      throw new Error(`Invalid token provided via --token flag. ${getErrorMessage(error)}`);
+    }
+  } else {
+    tokenResult = await promptForGitHubToken(existingConfig, prompts, github, log, spin);
+  }
+
   const githubToken = tokenResult?.githubToken ?? '';
   const githubUsername = tokenResult?.githubUsername ?? '';
 
   log.info(stepLabel(2, 4, 'Repository setup'));
-  const setupMode = await promptForRepositoryMode(prompts, githubToken.length > 0, log);
-  const repository = await promptForRepository(
-    setupMode,
-    prompts,
-    github,
-    githubToken || null,
-    githubUsername || null,
-    log,
-    spin,
-  );
+  const setupMode: RegistrySetupMode = options.repo
+    ? 'manual'
+    : await promptForRepositoryMode(prompts, githubToken.length > 0, log);
+  let repository: RegistryRepository;
+
+  if (options.repo) {
+    try {
+      if (githubToken) {
+        repository = await github.getRepository(githubToken, options.repo);
+      } else {
+        repository = github.resolveRepositoryFromUrl(options.repo);
+      }
+    } catch (error) {
+      throw new Error(`Invalid repository URL provided via --repo flag. ${getErrorMessage(error)}`);
+    }
+  } else {
+    repository = await promptForRepository(
+      setupMode,
+      prompts,
+      github,
+      githubToken || null,
+      githubUsername || null,
+      log,
+      spin,
+    );
+  }
   const effectiveUsername = githubUsername || repository.owner;
   const localRegistryPath = getConfiguredLocalRegistryPath(
     existingConfig,

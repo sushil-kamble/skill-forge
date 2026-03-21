@@ -31,7 +31,8 @@ export interface RegistryPrompts {
 }
 
 export interface PushRegistryOptions {
-  message?: string;
+  skill?: string;
+  all?: boolean;
 }
 
 export interface RegistryGitDependencies {
@@ -326,23 +327,34 @@ export async function pushRegistry(
     };
   });
 
-  const selected = await prompts.search<string>('Select a skill to push', [
-    ...choices,
-    {
-      value: '__all__',
-      name: 'Push all changes',
-      description: `${localSkills.filter((s) => s.hasChanges).length} with unpushed changes`,
-    },
-    {
-      value: '__cancel__',
-      name: 'Cancel',
-      description: 'Do not push',
-    },
-  ]);
+  let selected: string;
 
-  if (selected === '__cancel__') {
-    log.info('Push cancelled.');
-    return { status: 'cancelled' };
+  if (options.skill) {
+    if (!localSkills.some((s) => s.name === options.skill)) {
+      throw new Error(`Skill "${options.skill}" not found in local registry.`);
+    }
+    selected = options.skill;
+  } else if (options.all) {
+    selected = '__all__';
+  } else {
+    selected = await prompts.search<string>('Select a skill to push', [
+      ...choices,
+      {
+        value: '__all__',
+        name: 'Push all changes',
+        description: `${localSkills.filter((s) => s.hasChanges).length} with unpushed changes`,
+      },
+      {
+        value: '__cancel__',
+        name: 'Cancel',
+        description: 'Do not push',
+      },
+    ]);
+
+    if (selected === '__cancel__') {
+      log.info('Push cancelled.');
+      return { status: 'cancelled' };
+    }
   }
 
   {
@@ -377,8 +389,7 @@ export async function pushRegistry(
   }
 
   const commitMessage = sanitizeCommitMessage(
-    options.message ??
-      (selected === '__all__' ? createDefaultCommitMessage() : `chore: push skill "${selected}"`),
+    selected === '__all__' ? createDefaultCommitMessage() : `chore: push skill "${selected}"`,
   );
 
   {
@@ -416,7 +427,13 @@ export async function pushRegistry(
   };
 }
 
+export interface PullRegistryOptions {
+  skill?: string;
+  all?: boolean;
+}
+
 export async function pullRegistry(
+  options: PullRegistryOptions = {},
   dependencies: RegistryGitDependencies = {},
 ): Promise<PullRegistryResult> {
   const prompts = dependencies.prompts ?? registryPrompts;
@@ -463,23 +480,34 @@ export async function pullRegistry(
     }),
   );
 
-  const selected = await prompts.search<string>('Select a remote skill to pull', [
-    ...choices,
-    {
-      value: '__all__',
-      name: 'Pull all',
-      description: `${remoteSkills.length} remote skill${remoteSkills.length === 1 ? '' : 's'}`,
-    },
-    {
-      value: '__cancel__',
-      name: 'Cancel',
-      description: 'Do not pull',
-    },
-  ]);
+  let selected: string;
 
-  if (selected === '__cancel__') {
-    log.info('Pull cancelled.');
-    return { status: 'cancelled' };
+  if (options.skill) {
+    if (!remoteSkills.includes(options.skill)) {
+      throw new Error(`Skill "${options.skill}" not found in remote registry.`);
+    }
+    selected = options.skill;
+  } else if (options.all) {
+    selected = '__all__';
+  } else {
+    selected = await prompts.search<string>('Select a remote skill to pull', [
+      ...choices,
+      {
+        value: '__all__',
+        name: 'Pull all',
+        description: `${remoteSkills.length} remote skill${remoteSkills.length === 1 ? '' : 's'}`,
+      },
+      {
+        value: '__cancel__',
+        name: 'Cancel',
+        description: 'Do not pull',
+      },
+    ]);
+
+    if (selected === '__cancel__') {
+      log.info('Pull cancelled.');
+      return { status: 'cancelled' };
+    }
   }
 
   let beforeHead = '';

@@ -44,19 +44,22 @@ describe('unloadSkillPod', () => {
     await fs.mkdir(path.join(registryDir, 'skills'), { recursive: true });
     await fs.writeFile(path.join(registryDir, 'skills', '.gitkeep'), '', 'utf8');
 
-    const result = await unloadSkillPod({
-      prompts: createPromptStub(true),
-      logger: createSilentLogger(),
-      loadConfig: async () =>
-        createConfig({
-          githubToken: 'secret-token',
-          githubUsername: 'octocat',
-          registryRepoUrl: 'https://github.com/octocat/skills',
-          localRegistryPath: registryDir,
-          registryRepoName: 'skills',
-        }),
-      getConfigDirPath: () => configDir,
-    });
+    const result = await unloadSkillPod(
+      {},
+      {
+        prompts: createPromptStub(true),
+        logger: createSilentLogger(),
+        loadConfig: async () =>
+          createConfig({
+            githubToken: 'secret-token',
+            githubUsername: 'octocat',
+            registryRepoUrl: 'https://github.com/octocat/skills',
+            localRegistryPath: registryDir,
+            registryRepoName: 'skills',
+          }),
+        getConfigDirPath: () => configDir,
+      },
+    );
 
     assert.equal(result.status, 'completed');
     assert.equal(result.removedConfigDir, true);
@@ -81,12 +84,15 @@ describe('unloadSkillPod', () => {
     await fs.mkdir(configDir, { recursive: true });
     await fs.writeFile(path.join(configDir, 'config.json'), '{}', 'utf8');
 
-    const result = await unloadSkillPod({
-      prompts: createPromptStub(false),
-      logger: createSilentLogger(),
-      loadConfig: async () => createConfig(),
-      getConfigDirPath: () => configDir,
-    });
+    const result = await unloadSkillPod(
+      {},
+      {
+        prompts: createPromptStub(false),
+        logger: createSilentLogger(),
+        loadConfig: async () => createConfig(),
+        getConfigDirPath: () => configDir,
+      },
+    );
 
     assert.equal(result.status, 'cancelled');
     assert.equal(result.removedConfigDir, false);
@@ -103,12 +109,15 @@ describe('unloadSkillPod', () => {
     const sandbox = await makeTempDir('skillpod-unload-empty-');
     const configDir = path.join(sandbox, '.skillpod');
 
-    const result = await unloadSkillPod({
-      prompts: createPromptStub(true),
-      logger: createSilentLogger(),
-      loadConfig: async () => createConfig(),
-      getConfigDirPath: () => configDir,
-    });
+    const result = await unloadSkillPod(
+      {},
+      {
+        prompts: createPromptStub(true),
+        logger: createSilentLogger(),
+        loadConfig: async () => createConfig(),
+        getConfigDirPath: () => configDir,
+      },
+    );
 
     assert.equal(result.status, 'nothing_to_unload');
     assert.equal(result.removedConfigDir, false);
@@ -121,16 +130,19 @@ describe('unloadSkillPod', () => {
     await fs.mkdir(configDir, { recursive: true });
     await fs.writeFile(path.join(configDir, 'config.json'), '{}', 'utf8');
 
-    const result = await unloadSkillPod({
-      prompts: createPromptStub(true),
-      logger: createSilentLogger(),
-      loadConfig: async () =>
-        createConfig({
-          githubToken: 'token',
-          githubUsername: 'octocat',
-        }),
-      getConfigDirPath: () => configDir,
-    });
+    const result = await unloadSkillPod(
+      {},
+      {
+        prompts: createPromptStub(true),
+        logger: createSilentLogger(),
+        loadConfig: async () =>
+          createConfig({
+            githubToken: 'token',
+            githubUsername: 'octocat',
+          }),
+        getConfigDirPath: () => configDir,
+      },
+    );
 
     assert.equal(result.status, 'completed');
     assert.equal(result.removedConfigDir, true);
@@ -143,15 +155,18 @@ describe('unloadSkillPod', () => {
     const registryDir = path.join(sandbox, 'registry');
     await fs.mkdir(registryDir, { recursive: true });
 
-    const result = await unloadSkillPod({
-      prompts: createPromptStub(true),
-      logger: createSilentLogger(),
-      loadConfig: async () =>
-        createConfig({
-          localRegistryPath: registryDir,
-        }),
-      getConfigDirPath: () => configDir,
-    });
+    const result = await unloadSkillPod(
+      {},
+      {
+        prompts: createPromptStub(true),
+        logger: createSilentLogger(),
+        loadConfig: async () =>
+          createConfig({
+            localRegistryPath: registryDir,
+          }),
+        getConfigDirPath: () => configDir,
+      },
+    );
 
     assert.equal(result.status, 'completed');
     assert.equal(result.removedConfigDir, false);
@@ -164,22 +179,63 @@ describe('unloadSkillPod', () => {
     assert.equal(registryExists, false);
   });
 
+  test('skips confirmation with --yes flag', async () => {
+    const sandbox = await makeTempDir('skillpod-unload-yes-');
+    const configDir = path.join(sandbox, '.skillpod');
+    const registryDir = path.join(sandbox, 'registry');
+
+    await fs.mkdir(configDir, { recursive: true });
+    await fs.writeFile(path.join(configDir, 'config.json'), '{}', 'utf8');
+    await fs.mkdir(path.join(registryDir, 'skills'), { recursive: true });
+
+    let confirmCalled = false;
+    const result = await unloadSkillPod(
+      { yes: true },
+      {
+        prompts: {
+          async confirm(): Promise<boolean> {
+            confirmCalled = true;
+            return false;
+          },
+        },
+        logger: createSilentLogger(),
+        loadConfig: async () =>
+          createConfig({
+            githubToken: 'secret-token',
+            githubUsername: 'octocat',
+            registryRepoUrl: 'https://github.com/octocat/skills',
+            localRegistryPath: registryDir,
+            registryRepoName: 'skills',
+          }),
+        getConfigDirPath: () => configDir,
+      },
+    );
+
+    assert.equal(result.status, 'completed');
+    assert.equal(confirmCalled, false);
+    assert.equal(result.removedConfigDir, true);
+    assert.equal(result.removedLocalRegistry, true);
+  });
+
   test('handles local registry path that no longer exists on disk', async () => {
     const sandbox = await makeTempDir('skillpod-unload-gone-');
     const configDir = path.join(sandbox, '.skillpod');
     await fs.mkdir(configDir, { recursive: true });
     await fs.writeFile(path.join(configDir, 'config.json'), '{}', 'utf8');
 
-    const result = await unloadSkillPod({
-      prompts: createPromptStub(true),
-      logger: createSilentLogger(),
-      loadConfig: async () =>
-        createConfig({
-          githubToken: 'token',
-          localRegistryPath: path.join(sandbox, 'nonexistent-registry'),
-        }),
-      getConfigDirPath: () => configDir,
-    });
+    const result = await unloadSkillPod(
+      {},
+      {
+        prompts: createPromptStub(true),
+        logger: createSilentLogger(),
+        loadConfig: async () =>
+          createConfig({
+            githubToken: 'token',
+            localRegistryPath: path.join(sandbox, 'nonexistent-registry'),
+          }),
+        getConfigDirPath: () => configDir,
+      },
+    );
 
     assert.equal(result.status, 'completed');
     assert.equal(result.removedConfigDir, true);

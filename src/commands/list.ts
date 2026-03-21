@@ -4,6 +4,7 @@ import { listSkills } from '../core/skills.js';
 
 export const listCommand = new Command('list')
   .description('List available skills')
-  .action(async () => {
-    await listSkills();
+  .option('--json', 'Output skills as JSON (non-interactive)')
+  .action(async (options: { json?: boolean }) => {
+    await listSkills(options.json ? { json: true } : {});
   });

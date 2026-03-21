@@ -88,7 +88,7 @@ function createPromptStub(responses: string[]): InstallPrompts {
 }
 
 describe('install bridge', () => {
-  test('installSkills shows interactive skill selection when no --skill is provided', async () => {
+  test('installSkills shows interactive skill selection when no skill name is provided', async () => {
     const calls: Array<{ command: string; args: string[] }> = [];
 
     const result = await installSkills(
@@ -117,6 +117,78 @@ describe('install bridge', () => {
         args: ['skills', 'add', 'octocat/skills', '--skill', 'fastapi-structure'],
       },
     ]);
+  });
+
+  test('installSkills installs a specific skill by name', async () => {
+    const calls: Array<{ command: string; args: string[] }> = [];
+
+    const result = await installSkills(
+      { skill: 'fastapi-structure' },
+      {
+        github: createGitHubStub(createRepositoryStatus(), ['fastapi-structure', 'vue-composables']),
+        loadConfig: async () => createConfig(),
+        runner: {
+          async run(command, args) {
+            calls.push({ command, args });
+          },
+        },
+        logger: createRecordingLogger(),
+      },
+    );
+
+    assert.equal(result.selectedSkill, 'fastapi-structure');
+    assert.deepEqual(calls, [
+      {
+        command: 'npx',
+        args: ['skills', 'add', 'octocat/skills', '--skill', 'fastapi-structure'],
+      },
+    ]);
+  });
+
+  test('installSkills throws with available skills when skill name is not found', async () => {
+    await assert.rejects(
+      () =>
+        installSkills(
+          { skill: 'nonexistent-skill' },
+          {
+            github: createGitHubStub(createRepositoryStatus(), [
+              'fastapi-structure',
+              'vue-composables',
+              'react-hooks',
+            ]),
+            loadConfig: async () => createConfig(),
+            runner: {
+              async run() {},
+            },
+            logger: createRecordingLogger(),
+          },
+        ),
+      (error: Error) => {
+        assert.match(error.message, /Skill "nonexistent-skill" not found/);
+        assert.match(error.message, /fastapi-structure/);
+        assert.match(error.message, /vue-composables/);
+        assert.match(error.message, /react-hooks/);
+        return true;
+      },
+    );
+  });
+
+  test('installSkills throws with empty registry message when skill not found and no skills exist', async () => {
+    await assert.rejects(
+      () =>
+        installSkills(
+          { skill: 'nonexistent-skill' },
+          {
+            github: createGitHubStub(createRepositoryStatus(), []),
+            loadConfig: async () => createConfig(),
+            runner: {
+              async run() {},
+            },
+            logger: createRecordingLogger(),
+          },
+        ),
+      /No skills are available/,
+    );
   });
 
   test('installSkills returns early when user cancels interactive selection', async () => {
@@ -161,65 +233,6 @@ describe('install bridge', () => {
 
     assert.deepEqual(result.args, []);
     assert.match(logs.join('\n'), /No skills found in the remote registry/);
-  });
-
-  test('installSkills passes through repeated --skill, --agent, -g, -y, and --copy flags', async () => {
-    const calls: Array<{ command: string; args: string[] }> = [];
-
-    await installSkills(
-      {
-        agent: 'claude-code',
-        copy: true,
-        global: true,
-        skill: ['fastapi-structure', 'vue-composables'],
-        yes: true,
-      },
-      {
-        github: createGitHubStub(createRepositoryStatus()),
-        loadConfig: async () => createConfig(),
-        runner: {
-          async run(command, args) {
-            calls.push({ command, args });
-          },
-        },
-        logger: createRecordingLogger(),
-      },
-    );
-
-    assert.deepEqual(calls[0]?.args, [
-      'skills',
-      'add',
-      'octocat/skills',
-      '--skill',
-      'fastapi-structure',
-      '--skill',
-      'vue-composables',
-      '-g',
-      '--agent',
-      'claude-code',
-      '-y',
-      '--copy',
-    ]);
-  });
-
-  test('installSkills supports --list', async () => {
-    const calls: Array<{ command: string; args: string[] }> = [];
-
-    await installSkills(
-      { list: true },
-      {
-        github: createGitHubStub(createRepositoryStatus()),
-        loadConfig: async () => createConfig(),
-        runner: {
-          async run(command, args) {
-            calls.push({ command, args });
-          },
-        },
-        logger: createRecordingLogger(),
-      },
-    );
-
-    assert.deepEqual(calls[0]?.args, ['skills', 'add', 'octocat/skills', '--list']);
   });
 
   test('installSkills warns when the registry has no pushed skills', async () => {
@@ -273,9 +286,9 @@ describe('install bridge', () => {
     const capturedEnvs: Array<NodeJS.ProcessEnv | undefined> = [];
 
     await installSkills(
-      { skill: ['some-skill'] },
+      { skill: 'some-skill' },
       {
-        github: createGitHubStub(createRepositoryStatus({ isPrivate: false })),
+        github: createGitHubStub(createRepositoryStatus({ isPrivate: false }), ['some-skill']),
         loadConfig: async () => createConfig({ githubToken: 'ghp_secret' }),
         runner: {
           async run(_command, _args, env) {
@@ -315,9 +328,9 @@ describe('install bridge', () => {
     await assert.rejects(
       () =>
         installSkills(
-          { skill: ['some-skill'] },
+          { skill: 'some-skill' },
           {
-            github: createGitHubStub(createRepositoryStatus()),
+            github: createGitHubStub(createRepositoryStatus(), ['some-skill']),
             loadConfig: async () => createConfig(),
             runner: {
               async run() {
@@ -385,30 +398,99 @@ describe('install bridge', () => {
     );
   });
 
-  test('buildInstallArgs assembles the install command consistently', () => {
+  test('installSkills forwards passthrough flags to npx skills add', async () => {
+    const calls: Array<{ command: string; args: string[] }> = [];
+
+    await installSkills(
+      {
+        skill: 'fastapi-structure',
+        passthrough: ['-a', 'claude-code', '-a', 'opencode', '-g', '-y'],
+      },
+      {
+        github: createGitHubStub(createRepositoryStatus(), ['fastapi-structure']),
+        loadConfig: async () => createConfig(),
+        runner: {
+          async run(command, args) {
+            calls.push({ command, args });
+          },
+        },
+        logger: createRecordingLogger(),
+      },
+    );
+
+    assert.deepEqual(calls, [
+      {
+        command: 'npx',
+        args: [
+          'skills',
+          'add',
+          'octocat/skills',
+          '--skill',
+          'fastapi-structure',
+          '-a',
+          'claude-code',
+          '-a',
+          'opencode',
+          '-g',
+          '-y',
+        ],
+      },
+    ]);
+  });
+
+  test('installSkills forwards --copy flag via passthrough', async () => {
+    const calls: Array<{ command: string; args: string[] }> = [];
+
+    await installSkills(
+      {
+        skill: 'my-skill',
+        passthrough: ['--copy'],
+      },
+      {
+        github: createGitHubStub(createRepositoryStatus(), ['my-skill']),
+        loadConfig: async () => createConfig(),
+        runner: {
+          async run(command, args) {
+            calls.push({ command, args });
+          },
+        },
+        logger: createRecordingLogger(),
+      },
+    );
+
+    assert.deepEqual(calls[0]?.args, [
+      'skills',
+      'add',
+      'octocat/skills',
+      '--skill',
+      'my-skill',
+      '--copy',
+    ]);
+  });
+
+  test('buildInstallArgs assembles the install command correctly', () => {
     assert.deepEqual(
-      installInternals.buildInstallArgs('octocat/skills', {
-        agent: 'claude-code',
-        copy: true,
-        global: true,
-        list: true,
-        skill: ['fastapi-structure', 'vue-composables'],
-        yes: true,
-      }),
+      installInternals.buildInstallArgs('octocat/skills', 'fastapi-structure', []),
+      ['skills', 'add', 'octocat/skills', '--skill', 'fastapi-structure'],
+    );
+  });
+
+  test('buildInstallArgs appends passthrough flags', () => {
+    assert.deepEqual(
+      installInternals.buildInstallArgs('octocat/skills', 'fastapi-structure', [
+        '-g',
+        '-a',
+        'claude-code',
+      ]),
       [
         'skills',
         'add',
         'octocat/skills',
-        '--list',
         '--skill',
         'fastapi-structure',
-        '--skill',
-        'vue-composables',
         '-g',
-        '--agent',
+        '-a',
         'claude-code',
-        '-y',
-        '--copy',
       ],
     );
   });

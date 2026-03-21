@@ -1,10 +1,14 @@
 import { Command } from 'commander';
 
-import { editSkill } from '../core/skills.js';
+import { editSkill, type AuthoringMode } from '../core/skills.js';
 
 export const editCommand = new Command('edit')
   .description('Edit an existing skill')
   .argument('[name]', 'Skill name')
-  .action(async (name?: string) => {
-    await editSkill(name ? { name } : {});
+  .option('--mode <mode>', 'Authoring mode: skip, open-vscode, use-skill-creator')
+  .action(async (name: string | undefined, options: { mode?: AuthoringMode }) => {
+    await editSkill({
+      ...(name ? { name } : {}),
+      ...(options.mode ? { mode: options.mode } : {}),
+    });
   });

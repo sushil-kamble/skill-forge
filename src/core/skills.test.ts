@@ -213,6 +213,39 @@ describe('skill authoring commands', () => {
     );
   });
 
+  test('createSkill rejects unknown --mode values', async () => {
+    const config = await createInitializedConfig();
+
+    await assert.rejects(
+      () =>
+        createSkill(
+          { name: 'my-skill', mode: 'invalid-mode' as never },
+          {
+            loadConfig: async () => config,
+            logger: createSilentLogger(),
+          },
+        ),
+      /Invalid --mode "invalid-mode". Valid values: open-vscode, skip, use-skill-creator\./,
+    );
+  });
+
+  test('editSkill rejects unknown --mode values', async () => {
+    const config = await createInitializedConfig();
+    await writeSkillFile(config, 'my-skill');
+
+    await assert.rejects(
+      () =>
+        editSkill(
+          { name: 'my-skill', mode: 'bogus' as never },
+          {
+            loadConfig: async () => config,
+            logger: createSilentLogger(),
+          },
+        ),
+      /Invalid --mode "bogus". Valid values: open-vscode, skip, use-skill-creator\./,
+    );
+  });
+
   test('listSkills returns skills and opens authoring mode on selection', async () => {
     const config = await createInitializedConfig();
     const logs: string[] = [];
@@ -230,15 +263,18 @@ description:
 `,
     );
 
-    const skills = await listSkills({
-      prompts: new PromptStub({
-        select: ['fastapi-structure', 'open-vscode'],
-      }),
-      loadConfig: async () => config,
-      editor: createEditorStub(openedFiles),
-      logger: createRecordingLogger(logs),
-      getLocalChanges: noopGetLocalChanges,
-    });
+    const skills = await listSkills(
+      {},
+      {
+        prompts: new PromptStub({
+          select: ['fastapi-structure', 'open-vscode'],
+        }),
+        loadConfig: async () => config,
+        editor: createEditorStub(openedFiles),
+        logger: createRecordingLogger(logs),
+        getLocalChanges: noopGetLocalChanges,
+      },
+    );
 
     assert.equal(skills.length, 1);
     assert.equal(skills[0]?.name, 'fastapi-structure');
@@ -255,13 +291,16 @@ description:
     const openedFiles: string[] = [];
     await writeSkillFile(config, 'fastapi-structure');
 
-    const skills = await listSkills({
-      prompts: new PromptStub({ select: ['__cancel__'] }),
-      loadConfig: async () => config,
-      editor: createEditorStub(openedFiles),
-      logger: createSilentLogger(),
-      getLocalChanges: noopGetLocalChanges,
-    });
+    const skills = await listSkills(
+      {},
+      {
+        prompts: new PromptStub({ select: ['__cancel__'] }),
+        loadConfig: async () => config,
+        editor: createEditorStub(openedFiles),
+        logger: createSilentLogger(),
+        getLocalChanges: noopGetLocalChanges,
+      },
+    );
 
     assert.equal(skills.length, 1);
     assert.deepEqual(openedFiles, []);
@@ -272,10 +311,13 @@ description:
     const logs: string[] = [];
     await fs.rm(path.join(config.localRegistryPath!, 'skills'), { recursive: true, force: true });
 
-    const skills = await listSkills({
-      loadConfig: async () => config,
-      logger: createRecordingLogger(logs),
-    });
+    const skills = await listSkills(
+      {},
+      {
+        loadConfig: async () => config,
+        logger: createRecordingLogger(logs),
+      },
+    );
 
     assert.deepEqual(skills, []);
     await assert.doesNotReject(() => fs.access(path.join(config.localRegistryPath!, 'skills')));
@@ -293,13 +335,16 @@ description:
       'changed-skill': true,
     };
 
-    const skills = await listSkills({
-      prompts: new PromptStub({ select: ['__cancel__'] }),
-      loadConfig: async () => config,
-      logger: createRecordingLogger(logs),
-      getLocalChanges: async (_registryPath: string, skillName: string) =>
-        localChangesMap[skillName] ?? false,
-    });
+    const skills = await listSkills(
+      {},
+      {
+        prompts: new PromptStub({ select: ['__cancel__'] }),
+        loadConfig: async () => config,
+        logger: createRecordingLogger(logs),
+        getLocalChanges: async (_registryPath: string, skillName: string) =>
+          localChangesMap[skillName] ?? false,
+      },
+    );
 
     assert.equal(skills.length, 2);
   });
@@ -591,14 +636,156 @@ description: Missing the required name field
 `,
     );
 
-    const skills = await listSkills({
-      prompts: new PromptStub({ select: ['__cancel__'] }),
-      loadConfig: async () => config,
-      logger: createSilentLogger(),
-      getLocalChanges: noopGetLocalChanges,
-    });
+    const skills = await listSkills(
+      {},
+      {
+        prompts: new PromptStub({ select: ['__cancel__'] }),
+        loadConfig: async () => config,
+        logger: createSilentLogger(),
+        getLocalChanges: noopGetLocalChanges,
+      },
+    );
 
     assert.equal(skills[0]?.valid, false);
     assert.equal(skills[0]?.description, skillsInternals.DESCRIPTION_FALLBACK);
+  });
+
+  test('createSkill skips authoring mode prompt with --mode flag', async () => {
+    const config = await createInitializedConfig();
+    const logs: string[] = [];
+
+    await createSkill(
+      { name: 'agent-test', mode: 'skip' },
+      {
+        prompts: new PromptStub({}),
+        loadConfig: async () => config,
+        logger: createRecordingLogger(logs),
+      },
+    );
+
+    const skillFilePath = path.join(config.localRegistryPath!, 'skills', 'agent-test', 'SKILL.md');
+    await assert.doesNotReject(() => fs.access(skillFilePath));
+    assert.match(logs.join('\n'), /Created skill "agent-test"/);
+    assert.match(logs.join('\n'), /Skill created at/);
+  });
+
+  test('editSkill skips authoring mode prompt with --mode flag', async () => {
+    const config = await createInitializedConfig();
+    const openedFiles: string[] = [];
+    await writeSkillFile(config, 'agent-edit-test');
+    const skillDirectory = path.join(config.localRegistryPath!, 'skills', 'agent-edit-test');
+
+    await editSkill(
+      { name: 'agent-edit-test', mode: 'open-vscode' },
+      {
+        prompts: new PromptStub({}),
+        loadConfig: async () => config,
+        editor: createEditorStub(openedFiles),
+        logger: createSilentLogger(),
+      },
+    );
+
+    assert.deepEqual(openedFiles, [skillDirectory]);
+  });
+
+  test('removeSkill skips confirmation with --yes flag', async () => {
+    const config = await createInitializedConfig();
+    await writeSkillFile(config, 'to-remove');
+
+    let confirmCalled = false;
+
+    const removed = await removeSkill(
+      { name: 'to-remove', yes: true },
+      {
+        loadConfig: async () => config,
+        prompts: {
+          async input() {
+            throw new Error('should not be called');
+          },
+          async confirm() {
+            confirmCalled = true;
+            return false;
+          },
+          async search() {
+            throw new Error('should not be called');
+          },
+          async select() {
+            throw new Error('should not be called');
+          },
+        },
+        logger: createSilentLogger(),
+      },
+    );
+
+    assert.equal(removed, 'to-remove');
+    assert.equal(confirmCalled, false);
+  });
+
+  test('removeSkill auto-pushes with --push flag', async () => {
+    const config = await createInitializedConfig();
+    let pushMessage: string | undefined;
+    await writeSkillFile(config, 'push-test');
+
+    const removed = await removeSkill(
+      { name: 'push-test', yes: true, push: true },
+      {
+        loadConfig: async () => config,
+        prompts: new PromptStub({}),
+        logger: createSilentLogger(),
+        pushToRemote: async (message: string) => {
+          pushMessage = message;
+          return true;
+        },
+      },
+    );
+
+    assert.equal(removed, 'push-test');
+    assert.match(pushMessage!, /remove skill "push-test"/);
+  });
+
+  test('listSkills with --json outputs JSON and skips prompts', async () => {
+    const config = await createInitializedConfig();
+    const logs: string[] = [];
+    await writeSkillFile(
+      config,
+      'json-test',
+      `---
+name: json-test
+description: A test skill
+---
+
+# JSON Test
+`,
+    );
+
+    const skills = await listSkills(
+      { json: true },
+      {
+        loadConfig: async () => config,
+        logger: createRecordingLogger(logs),
+      },
+    );
+
+    assert.equal(skills.length, 1);
+    const output = JSON.parse(logs.join('\n'));
+    assert.equal(output[0].name, 'json-test');
+    assert.equal(output[0].description, 'A test skill');
+    assert.equal(output[0].valid, true);
+  });
+
+  test('listSkills with --json shows empty array when no skills', async () => {
+    const config = await createInitializedConfig();
+    const logs: string[] = [];
+
+    const skills = await listSkills(
+      { json: true },
+      {
+        loadConfig: async () => config,
+        logger: createRecordingLogger(logs),
+      },
+    );
+
+    assert.deepEqual(skills, []);
+    assert.equal(logs[0], '[]');
   });
 });

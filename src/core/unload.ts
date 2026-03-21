@@ -34,7 +34,14 @@ async function removeDirectory(targetPath: string): Promise<void> {
   await fs.rm(targetPath, { recursive: true, force: true });
 }
 
-export async function unloadSkillPod(dependencies: UnloadDependencies = {}): Promise<UnloadResult> {
+export interface UnloadOptions {
+  yes?: boolean;
+}
+
+export async function unloadSkillPod(
+  options: UnloadOptions = {},
+  dependencies: UnloadDependencies = {},
+): Promise<UnloadResult> {
   const prompts = dependencies.prompts ?? defaultPrompts;
   const log = dependencies.logger ?? logger;
   const readConfig = dependencies.loadConfig ?? loadConfig;
@@ -64,7 +71,9 @@ export async function unloadSkillPod(dependencies: UnloadDependencies = {}): Pro
     log.warn('    (local clone — your remote repository on GitHub is not affected)');
   }
 
-  const shouldProceed = await prompts.confirm('Are you sure you want to unload skillpod?', false);
+  const shouldProceed =
+    options.yes === true ||
+    (await prompts.confirm('Are you sure you want to unload skillpod?', false));
 
   if (!shouldProceed) {
     log.info('Unload cancelled.');

@@ -10,12 +10,8 @@ import { logger, type Logger } from '../utils/logger.js';
 import type { SkillPodConfig } from '../types/config.js';
 
 export interface InstallSkillsOptions {
-  agent?: string;
-  copy?: boolean;
-  global?: boolean;
-  list?: boolean;
-  skill?: string[];
-  yes?: boolean;
+  skill?: string;
+  passthrough?: string[];
 }
 
 export interface InstallRunner {
@@ -111,36 +107,12 @@ const installPrompts: InstallPrompts = {
   },
 };
 
-function buildInstallArgs(registryTarget: string, options: InstallSkillsOptions): string[] {
-  const args = ['skills', 'add', registryTarget];
-
-  if (options.list) {
-    args.push('--list');
-  }
-
-  if (options.skill) {
-    for (const skillName of options.skill) {
-      args.push('--skill', skillName);
-    }
-  }
-
-  if (options.global) {
-    args.push('-g');
-  }
-
-  if (options.agent) {
-    args.push('--agent', options.agent);
-  }
-
-  if (options.yes) {
-    args.push('-y');
-  }
-
-  if (options.copy) {
-    args.push('--copy');
-  }
-
-  return args;
+function buildInstallArgs(
+  registryTarget: string,
+  skill: string,
+  passthrough: string[],
+): string[] {
+  return ['skills', 'add', registryTarget, '--skill', skill, ...passthrough];
 }
 
 function isCommandNotFound(error: unknown): boolean {
@@ -221,7 +193,24 @@ export async function installSkills(
 
   let selectedSkill: string | undefined;
 
-  if (!options.skill && !options.list) {
+  if (options.skill) {
+    const remoteSkills = await github.listRemoteSkills(githubToken, owner, repo);
+
+    if (!remoteSkills.includes(options.skill)) {
+      if (remoteSkills.length > 0) {
+        const skillList = remoteSkills.map((s) => `  - ${s}`).join('\n');
+        throw new Error(
+          `Skill "${options.skill}" not found in the remote registry.\n\nAvailable skills:\n${skillList}`,
+        );
+      }
+
+      throw new Error(
+        `Skill "${options.skill}" not found. No skills are available in the remote registry.`,
+      );
+    }
+
+    selectedSkill = options.skill;
+  } else {
     const chosen = await selectRemoteSkill(githubToken, owner, repo, github, prompts, log);
 
     if (!chosen) {
@@ -229,10 +218,9 @@ export async function installSkills(
     }
 
     selectedSkill = chosen;
-    options = { ...options, skill: [chosen] };
   }
 
-  const args = buildInstallArgs(registryTarget, options);
+  const args = buildInstallArgs(registryTarget, selectedSkill, options.passthrough ?? []);
 
   const env: NodeJS.ProcessEnv = { ...process.env };
   if (repositoryStatus.isPrivate && githubToken) {
@@ -255,9 +243,7 @@ export async function installSkills(
     throw new Error(`Failed to run "npx ${args.join(' ')}". ${getErrorMessage(error)}`);
   }
 
-  if (!options.list) {
-    log.success('Your skills are now available in your agents.');
-  }
+  log.success('Your skills are now available in your agents.');
 
   return {
     args,

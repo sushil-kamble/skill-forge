@@ -9,6 +9,7 @@ import { listCommand } from './list.js';
 import { pullCommand } from './pull.js';
 import { pushCommand } from './push.js';
 import { removeCommand } from './remove.js';
+import { sendCommand } from './send.js';
 import { unloadCommand } from './unload.js';
 
 export function registerCommands(program: Command): void {
@@ -21,6 +22,7 @@ export function registerCommands(program: Command): void {
     removeCommand,
     pushCommand,
     pullCommand,
+    sendCommand,
     installCommand,
     unloadCommand,
   ].forEach((command) => {

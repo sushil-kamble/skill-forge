@@ -180,16 +180,19 @@ describe('initializeSkillPod', () => {
       }),
     });
 
-    const result = await initializeSkillPod({
-      prompts,
-      github,
-      git: gitService,
-      logger: createSilentLogger(),
-      loadConfig: configStore.loadConfig,
-      saveConfig: configStore.saveConfig,
-      getLocalRegistryPath: () => localRegistryPath,
-      spinner: createSilentSpinnerFactory(),
-    });
+    const result = await initializeSkillPod(
+      {},
+      {
+        prompts,
+        github,
+        git: gitService,
+        logger: createSilentLogger(),
+        loadConfig: configStore.loadConfig,
+        saveConfig: configStore.saveConfig,
+        getLocalRegistryPath: () => localRegistryPath,
+        spinner: createSilentSpinnerFactory(),
+      },
+    );
 
     assert.equal(result.status, 'completed');
     assert.equal(configStore.savedConfig?.githubToken, 'valid-token');
@@ -226,16 +229,19 @@ describe('initializeSkillPod', () => {
       },
     });
 
-    const result = await initializeSkillPod({
-      prompts,
-      github,
-      git: gitService,
-      logger: createSilentLogger(),
-      loadConfig: configStore.loadConfig,
-      saveConfig: configStore.saveConfig,
-      getLocalRegistryPath: () => localRegistryPath,
-      spinner: createSilentSpinnerFactory(),
-    });
+    const result = await initializeSkillPod(
+      {},
+      {
+        prompts,
+        github,
+        git: gitService,
+        logger: createSilentLogger(),
+        loadConfig: configStore.loadConfig,
+        saveConfig: configStore.saveConfig,
+        getLocalRegistryPath: () => localRegistryPath,
+        spinner: createSilentSpinnerFactory(),
+      },
+    );
 
     assert.equal(result.status, 'completed');
     await assert.doesNotReject(() => fs.access(path.join(localRegistryPath, 'README.md')));
@@ -273,16 +279,19 @@ describe('initializeSkillPod', () => {
       }),
     });
 
-    const result = await initializeSkillPod({
-      prompts,
-      github,
-      git: gitService,
-      logger: createSilentLogger(),
-      loadConfig: configStore.loadConfig,
-      saveConfig: configStore.saveConfig,
-      getLocalRegistryPath: () => localRegistryPath,
-      spinner: createSilentSpinnerFactory(),
-    });
+    const result = await initializeSkillPod(
+      {},
+      {
+        prompts,
+        github,
+        git: gitService,
+        logger: createSilentLogger(),
+        loadConfig: configStore.loadConfig,
+        saveConfig: configStore.saveConfig,
+        getLocalRegistryPath: () => localRegistryPath,
+        spinner: createSilentSpinnerFactory(),
+      },
+    );
 
     assert.equal(result.status, 'completed');
     assert.equal(attempts, 2);
@@ -310,16 +319,19 @@ describe('initializeSkillPod', () => {
 
     await assert.rejects(
       () =>
-        initializeSkillPod({
-          prompts,
-          github,
-          git: gitService,
-          logger: createSilentLogger(),
-          loadConfig: configStore.loadConfig,
-          saveConfig: configStore.saveConfig,
-          getLocalRegistryPath: () => localRegistryPath,
-          spinner: createSilentSpinnerFactory(),
-        }),
+        initializeSkillPod(
+          {},
+          {
+            prompts,
+            github,
+            git: gitService,
+            logger: createSilentLogger(),
+            loadConfig: configStore.loadConfig,
+            saveConfig: configStore.saveConfig,
+            getLocalRegistryPath: () => localRegistryPath,
+            spinner: createSilentSpinnerFactory(),
+          },
+        ),
       /is not a git repository/,
     );
   });
@@ -336,15 +348,18 @@ describe('initializeSkillPod', () => {
       registryRepoName: 'skills',
     });
 
-    const result = await initializeSkillPod({
-      prompts,
-      github: createGitHubStub({}),
-      git: gitService,
-      logger: createSilentLogger(),
-      loadConfig: configStore.loadConfig,
-      saveConfig: configStore.saveConfig,
-      spinner: createSilentSpinnerFactory(),
-    });
+    const result = await initializeSkillPod(
+      {},
+      {
+        prompts,
+        github: createGitHubStub({}),
+        git: gitService,
+        logger: createSilentLogger(),
+        loadConfig: configStore.loadConfig,
+        saveConfig: configStore.saveConfig,
+        spinner: createSilentSpinnerFactory(),
+      },
+    );
 
     assert.equal(result.status, 'cancelled');
     assert.equal(configStore.savedConfig, null);
@@ -374,16 +389,19 @@ describe('initializeSkillPod', () => {
       }),
     });
 
-    const result = await initializeSkillPod({
-      prompts,
-      github,
-      git: gitService,
-      logger: createSilentLogger(),
-      loadConfig: configStore.loadConfig,
-      saveConfig: configStore.saveConfig,
-      getLocalRegistryPath: () => localRegistryPath,
-      spinner: createSilentSpinnerFactory(),
-    });
+    const result = await initializeSkillPod(
+      {},
+      {
+        prompts,
+        github,
+        git: gitService,
+        logger: createSilentLogger(),
+        loadConfig: configStore.loadConfig,
+        saveConfig: configStore.saveConfig,
+        getLocalRegistryPath: () => localRegistryPath,
+        spinner: createSilentSpinnerFactory(),
+      },
+    );
 
     assert.equal(result.status, 'completed');
     assert.equal(validateCalledWith, 'saved-token');
@@ -414,16 +432,19 @@ describe('initializeSkillPod', () => {
       },
     });
 
-    const result = await initializeSkillPod({
-      prompts,
-      github,
-      git: gitService,
-      logger: createSilentLogger(),
-      loadConfig: configStore.loadConfig,
-      saveConfig: configStore.saveConfig,
-      getLocalRegistryPath: () => localRegistryPath,
-      spinner: createSilentSpinnerFactory(),
-    });
+    const result = await initializeSkillPod(
+      {},
+      {
+        prompts,
+        github,
+        git: gitService,
+        logger: createSilentLogger(),
+        loadConfig: configStore.loadConfig,
+        saveConfig: configStore.saveConfig,
+        getLocalRegistryPath: () => localRegistryPath,
+        spinner: createSilentSpinnerFactory(),
+      },
+    );
 
     assert.equal(result.status, 'completed');
     assert.equal(configStore.savedConfig?.registryRepoUrl, 'https://github.com/octocat/skills');
@@ -453,16 +474,19 @@ describe('initializeSkillPod', () => {
       },
     });
 
-    const result = await initializeSkillPod({
-      prompts,
-      github,
-      git: gitService,
-      logger: createSilentLogger(),
-      loadConfig: configStore.loadConfig,
-      saveConfig: configStore.saveConfig,
-      getLocalRegistryPath: () => localRegistryPath,
-      spinner: createSilentSpinnerFactory(),
-    });
+    const result = await initializeSkillPod(
+      {},
+      {
+        prompts,
+        github,
+        git: gitService,
+        logger: createSilentLogger(),
+        loadConfig: configStore.loadConfig,
+        saveConfig: configStore.saveConfig,
+        getLocalRegistryPath: () => localRegistryPath,
+        spinner: createSilentSpinnerFactory(),
+      },
+    );
 
     assert.equal(result.status, 'completed');
     assert.equal(
@@ -488,20 +512,138 @@ describe('initializeSkillPod', () => {
       }),
     });
 
-    const result = await initializeSkillPod({
-      prompts,
-      github,
-      git: gitService,
-      logger: createSilentLogger(),
-      loadConfig: configStore.loadConfig,
-      saveConfig: configStore.saveConfig,
-      getLocalRegistryPath: () => localRegistryPath,
-      spinner: createSilentSpinnerFactory(),
-    });
+    const result = await initializeSkillPod(
+      {},
+      {
+        prompts,
+        github,
+        git: gitService,
+        logger: createSilentLogger(),
+        loadConfig: configStore.loadConfig,
+        saveConfig: configStore.saveConfig,
+        getLocalRegistryPath: () => localRegistryPath,
+        spinner: createSilentSpinnerFactory(),
+      },
+    );
 
     assert.equal(result.status, 'completed');
     assert.equal(configStore.savedConfig?.githubToken, '');
     assert.equal(configStore.savedConfig?.githubUsername, 'octocat');
     assert.equal(configStore.savedConfig?.registryRepoUrl, 'https://github.com/octocat/skills');
+  });
+
+  test('skips token prompt with --token flag', async () => {
+    const remotePath = await createRemoteRepository('skills');
+    const localRegistryPath = path.join(await makeTempDir('skillpod-token-flag-'), 'registry');
+    const prompts = new PromptStub({
+      select: ['auto'],
+    });
+    const configStore = createConfigStore();
+    const github = createGitHubStub({
+      createSkillsRepository: async () => ({
+        cloneUrl: remotePath,
+        htmlUrl: 'https://github.com/octocat/skills',
+        owner: 'octocat',
+        repo: 'skills',
+      }),
+    });
+
+    const result = await initializeSkillPod(
+      { token: 'flag-token' },
+      {
+        prompts,
+        github,
+        git: gitService,
+        logger: createSilentLogger(),
+        loadConfig: configStore.loadConfig,
+        saveConfig: configStore.saveConfig,
+        getLocalRegistryPath: () => localRegistryPath,
+        spinner: createSilentSpinnerFactory(),
+      },
+    );
+
+    assert.equal(result.status, 'completed');
+    assert.equal(configStore.savedConfig?.githubToken, 'flag-token');
+  });
+
+  test('skips repo prompts with --repo flag', async () => {
+    const remotePath = await createRemoteRepository('skills');
+    const localRegistryPath = path.join(await makeTempDir('skillpod-repo-flag-'), 'registry');
+    const prompts = new PromptStub({
+      password: ['valid-token'],
+    });
+    const configStore = createConfigStore();
+    const github = createGitHubStub({
+      getRepository: async (_token, repoUrl) => ({
+        cloneUrl: remotePath,
+        htmlUrl: repoUrl,
+        owner: 'octocat',
+        repo: 'skills',
+      }),
+    });
+
+    const result = await initializeSkillPod(
+      { repo: 'https://github.com/octocat/skills' },
+      {
+        prompts,
+        github,
+        git: gitService,
+        logger: createSilentLogger(),
+        loadConfig: configStore.loadConfig,
+        saveConfig: configStore.saveConfig,
+        getLocalRegistryPath: () => localRegistryPath,
+        spinner: createSilentSpinnerFactory(),
+      },
+    );
+
+    assert.equal(result.status, 'completed');
+    assert.equal(configStore.savedConfig?.registryRepoUrl, 'https://github.com/octocat/skills');
+  });
+
+  test('skips reinitialize prompt with --yes flag', async () => {
+    const remotePath = await createRemoteRepository('skills');
+    const localRegistryPath = path.join(await makeTempDir('skillpod-yes-flag-'), 'registry');
+    let confirmCalled = false;
+    const prompts = new PromptStub({
+      select: ['auto'],
+    });
+    const configStore = createConfigStore({
+      githubToken: 'existing-token',
+      githubUsername: 'octocat',
+      registryRepoUrl: 'https://github.com/octocat/skills',
+      localRegistryPath: '/tmp/old-registry',
+      registryRepoName: 'skills',
+    });
+    const originalConfirm = prompts.confirm.bind(prompts);
+    prompts.confirm = async (...args: Parameters<typeof prompts.confirm>) => {
+      confirmCalled = true;
+      return originalConfirm(...args);
+    };
+    const github = createGitHubStub({
+      createSkillsRepository: async () => ({
+        cloneUrl: remotePath,
+        htmlUrl: 'https://github.com/octocat/skills',
+        owner: 'octocat',
+        repo: 'skills',
+      }),
+    });
+
+    const result = await initializeSkillPod(
+      { yes: true },
+      {
+        prompts,
+        github,
+        git: gitService,
+        logger: createSilentLogger(),
+        loadConfig: configStore.loadConfig,
+        saveConfig: configStore.saveConfig,
+        getLocalRegistryPath: () => localRegistryPath,
+        spinner: createSilentSpinnerFactory(),
+      },
+    );
+
+    assert.equal(result.status, 'completed');
+    assert.equal(confirmCalled, false);
+    assert.equal(configStore.savedConfig?.githubToken, 'existing-token');
   });
 });
