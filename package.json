@@ -1,6 +1,6 @@
 {
   "name": "skillpod",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "CLI for authoring and managing personal agent skills registries.",
   "type": "module",
   "main": "./dist/index.js",
@@ -15,7 +15,7 @@
     "build": "pnpm run clean && tsc -p tsconfig.json && tsc-alias -p tsconfig.json && chmod +x dist/index.js",
     "dev": "tsx src/index.ts",
     "prepublishOnly": "pnpm run build && pnpm test",
-    "test": "tsx --test src/*.test.ts src/**/*.test.ts",
+    "test": "tsx --test $(find src -name '*.test.ts' | sort)",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "format": "prettier --write \"src/**/*.ts\"",
